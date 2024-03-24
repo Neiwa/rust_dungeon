@@ -1,3 +1,4 @@
+use console::ConsoleUnit;
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -6,15 +7,15 @@ use crossterm::{
     terminal,
     terminal::{size, SetSize},
 };
-use monster::console_monster::ConsoleRepresentation;
 use std::{
     io::{self, Write},
     time::{Duration, Instant},
 };
 
-mod coord;
 mod monster;
-use crate::coord::*;
+mod console;
+pub mod point;
+use crate::console::coord::*;
 use crate::monster::*;
 
 struct State {
@@ -22,7 +23,7 @@ struct State {
     clock_coord: Coord,
     score_coord: Coord,
     start: Instant,
-    monsters: Vec<monster::Monster<ConsoleRepresentation>>,
+    monsters: Vec<monster::Monster>,
 }
 
 fn main() -> io::Result<()> {
@@ -88,12 +89,13 @@ fn queue_score_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()> {
 
 fn queue_monsters_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()> {
     for monster in &state.monsters {
+        let unit = monster;
         queue!(
             stdout,
             cursor::MoveTo(monster.last_coord.x as u16, monster.last_coord.y as u16),
             style::PrintStyledContent(" ".black()),
-            cursor::MoveTo(monster.coord.x as u16, monster.coord.y as u16),
-            style::PrintStyledContent(monster.repr.symbol.with(monster.repr.color)),
+            cursor::MoveTo(monster.coord().x as u16, monster.coord().y as u16),
+            style::PrintStyledContent(unit.symbol().with(unit.color())),
         )?;
     }
 
@@ -102,7 +104,7 @@ fn queue_monsters_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()>
 
 fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let (t_cols, t_rows) = size()?;
-    let cols = (t_cols as i32).clamp(0, 50);
+    let cols = (t_cols as i32).clamp(0, 70);
     let rows = (t_rows as i32).clamp(0, 30);
 
     let mut state = State {
@@ -111,19 +113,17 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         clock_coord: Coord::new(cols as i32 - 5, 0),
         score_coord: Coord::new(5, 0),
         monsters: vec![
-            Monster::<ConsoleRepresentation>::new(Coord::new(cols as i32 / 4, rows as i32 / 4)),
-            Monster::new_console(
+            Monster::new(Coord::new(cols as i32 / 4, rows as i32 / 4)),
+            Monster::new_complex(
                 Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
                 Some(40),
-                Some('X'),
             ),
-            Monster::new_console(
+            Monster::new_complex(
                 Coord::new(
                     cols as i32 / 4 + cols as i32 / 2,
                     rows as i32 / 4 + rows as i32 / 2,
                 ),
                 Some(500),
-                Some('S'),
             ),
         ],
     };
@@ -169,15 +169,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
 
         if tick {
+            tick = false;
             state.score -= 1;
 
             queue_score_draw(stdout, &state)?;
-            tick = false;
 
             for monster in &mut state.monsters {
                 monster.seek(pos);
 
-                if monster.coord == pos {
+                if monster.coord() == pos {
                     state.score = 0;
                     exit = true;
                 }

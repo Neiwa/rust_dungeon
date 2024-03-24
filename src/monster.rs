@@ -8,7 +8,6 @@ pub struct Player {
 
 pub struct Monster {
     pub location: Point,
-    pub coord: Coord,
     pub last_coord: Coord,
     pub speed: i32,
     pub id: i32,
@@ -22,44 +21,34 @@ impl Monster {
     pub fn new_complex(coord: Coord, speed: Option<i32>) -> Self {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
-            coord: coord,
             last_coord: coord,
             speed: speed.unwrap_or(100),
             id: random(),
         }
     }
 
-    fn step(&mut self, step: Coord) -> Coord {
-        self.last_coord = self.coord;
-        self.coord += step;
-        self.coord
+    fn step(&mut self, step: Point) -> Point {
+        self.last_coord = self.location.as_coord();
+        self.location += step;
+        self.location
     }
 
-    pub fn seek(&mut self, seek_coord: Coord) -> Coord {
-        let step = match rand::random::<i32>() % self.speed {
-            ..=19 => {
-                if seek_coord.x - self.coord.x == 0 {
-                    Coord::new(0, (seek_coord.y - self.coord.y).clamp(-1, 1))
-                } else {
-                    Coord::new((seek_coord.x - self.coord.x).clamp(-1, 1), 0)
-                }
-            }
-            ..=39 => {
-                if seek_coord.y - self.coord.y == 0 {
-                    Coord::new((seek_coord.x - self.coord.x).clamp(-1, 1), 0)
-                } else {
-                    Coord::new(0, (seek_coord.y - self.coord.y).clamp(-1, 1))
-                }
-            }
-            ..=59 => Coord::new((seek_coord.x - self.coord.x).clamp(-1, 1), 0),
-            ..=79 => Coord::new(0, (seek_coord.y - self.coord.y).clamp(-1, 1)),
-            ..=84 => Direction::Right.as_coord(),
-            ..=89 => Direction::Left.as_coord(),
-            ..=94 => Direction::Up.as_coord(),
-            ..=99 => Direction::Down.as_coord(),
-            _ => Coord::new(0, 0),
-        };
+    pub fn seek(&mut self, seek_point: Point, elapsed: u128) {
 
-        self.step(step)
+        let step = match rand::random::<i32>() % self.speed {
+            ..=39 => Point::new(
+                (seek_point.x - self.location.x),
+                (seek_point.y - self.location.y),
+            ),
+            ..=59 => Point::new((seek_point.x - self.location.x), 0.0),
+            ..=79 => Point::new(0.0, (seek_point.y - self.location.y)),
+            ..=84 => Direction::Right.as_point(),
+            ..=89 => Direction::Left.as_point(),
+            ..=94 => Direction::Up.as_point(),
+            ..=99 => Direction::Down.as_point(),
+            _ => Point::new(0.0, 0.0),
+        }.normalize();
+
+        self.step(step);
     }
 }

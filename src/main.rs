@@ -175,7 +175,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             queue_score_draw(stdout, &state)?;
 
             for monster in &mut state.monsters {
-                monster.seek(pos);
+                monster.seek(pos.as_point(), ticker);
 
                 if monster.coord() == pos {
                     state.score = 0;

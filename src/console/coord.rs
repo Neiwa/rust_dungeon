@@ -1,5 +1,7 @@
 use std::ops;
 
+use crate::point::Point;
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Coord {
     pub x: i32,
@@ -9,6 +11,22 @@ pub struct Coord {
 impl Coord {
     pub fn new(x: i32, y: i32) -> Self {
         Self { x, y }
+    }
+
+    pub fn as_point(&self) -> Point {
+        Point {
+            x: self.x as f64,
+            y: self.y as f64,
+        }
+    }
+}
+
+impl Point {
+    pub fn as_coord(&self) -> Coord {
+        Coord {
+            x: self.x.round() as i32,
+            y: self.y.round() as i32,
+        }
     }
 }
 

@@ -39,6 +39,6 @@ impl ConsoleUnit for Monster {
     }
 
     fn coord(&self) -> Coord {
-        self.coord
+        self.location.as_coord()
     }
 }

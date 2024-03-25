@@ -7,23 +7,27 @@ use crossterm::{
     terminal,
     terminal::{size, SetSize},
 };
+use point::Point;
 use std::{
+    collections::VecDeque,
     io::{self, Write},
+    ops::Deref,
     time::{Duration, Instant},
 };
 
-mod monster;
 mod console;
 pub mod point;
+mod unit;
 use crate::console::coord::*;
-use crate::monster::*;
+use crate::unit::*;
 
 struct State {
     score: i32,
     clock_coord: Coord,
     score_coord: Coord,
     start: Instant,
-    monsters: Vec<monster::Monster>,
+    monsters: Vec<unit::Unit>,
+    player: Player,
 }
 
 fn main() -> io::Result<()> {
@@ -87,16 +91,21 @@ fn queue_score_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()> {
     Ok(())
 }
 
+fn queue_unit_draw(stdout: &mut io::Stdout, unit: &dyn ConsoleUnit) -> io::Result<()> {
+    queue!(
+        stdout,
+        cursor::MoveTo(unit.last_coord().x as u16, unit.last_coord().y as u16),
+        style::PrintStyledContent(" ".black()),
+        cursor::MoveTo(unit.coord().x as u16, unit.coord().y as u16),
+        style::PrintStyledContent(unit.symbol().with(unit.color())),
+    )?;
+
+    Ok(())
+}
+
 fn queue_monsters_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()> {
     for monster in &state.monsters {
-        let unit = monster;
-        queue!(
-            stdout,
-            cursor::MoveTo(monster.last_coord.x as u16, monster.last_coord.y as u16),
-            style::PrintStyledContent(" ".black()),
-            cursor::MoveTo(monster.coord().x as u16, monster.coord().y as u16),
-            style::PrintStyledContent(unit.symbol().with(unit.color())),
-        )?;
+        queue_unit_draw(stdout, monster)?;
     }
 
     Ok(())
@@ -112,13 +121,14 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         score: 100,
         clock_coord: Coord::new(cols as i32 - 5, 0),
         score_coord: Coord::new(5, 0),
+        player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2)),
         monsters: vec![
-            Monster::new(Coord::new(cols as i32 / 4, rows as i32 / 4)),
-            Monster::new_complex(
+            Unit::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
+            Unit::new(
                 Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
                 Some(40),
             ),
-            Monster::new_complex(
+            Unit::new(
                 Coord::new(
                     cols as i32 / 4 + cols as i32 / 2,
                     rows as i32 / 4 + rows as i32 / 2,
@@ -127,6 +137,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             ),
         ],
     };
+
+    state.monsters.push(Unit::new(
+        Coord::new(cols as i32 / 4, rows as i32 / 4 + rows as i32 / 2),
+        Some(200),
+    ));
 
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     for y in 0..rows {
@@ -150,15 +165,13 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         x: (cols as i32 / 2),
         y: (rows as i32 / 2),
     };
-    execute!(
-        stdout,
-        cursor::MoveTo(pos.x as u16, pos.y as u16),
-        style::PrintStyledContent("*".cyan())
-    )?;
+
+    queue_unit_draw(stdout, &state.player)?;
 
     let mut last_tick: u128 = 0;
     let mut tick = false;
     let mut exit = false;
+    let mut move_queue: VecDeque<Direction> = VecDeque::new();
 
     loop {
         let elapsed = state.start.elapsed();
@@ -168,28 +181,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             tick = true;
         }
 
-        if tick {
-            tick = false;
-            state.score -= 1;
-
-            queue_score_draw(stdout, &state)?;
-
-            for monster in &mut state.monsters {
-                monster.seek(pos.as_point(), ticker);
-
-                if monster.coord() == pos {
-                    state.score = 0;
-                    exit = true;
-                }
-            }
-
-            queue_monsters_draw(stdout, &state)?;
-        }
-
-        queue_clock_draw(stdout, &state)?;
-
         if poll(Duration::from_millis(50))? {
-            let prev_pos = pos;
             match read()? {
                 Event::Key(KeyEvent {
                     code,
@@ -197,24 +189,28 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     ..
                 }) => match code {
                     KeyCode::Left => {
-                        if pos.x - 1 > 0 {
-                            pos += Direction::Left;
+                        if move_queue.len() > 2 {
+                            move_queue.pop_back();
                         }
+                        move_queue.push_back(Direction::Left);
                     }
                     KeyCode::Right => {
-                        if pos.x + 2 < cols as i32 {
-                            pos += Direction::Right;
+                        if move_queue.len() > 2 {
+                            move_queue.pop_back();
                         }
+                        move_queue.push_back(Direction::Right);
                     }
                     KeyCode::Up => {
-                        if pos.y - 1 > 0 {
-                            pos += Direction::Up;
+                        if move_queue.len() > 2 {
+                            move_queue.pop_back();
                         }
+                        move_queue.push_back(Direction::Up);
                     }
                     KeyCode::Down => {
-                        if pos.y + 2 < rows as i32 {
-                            pos += Direction::Down;
+                        if move_queue.len() > 2 {
+                            move_queue.pop_back();
                         }
+                        move_queue.push_back(Direction::Down);
                     }
                     KeyCode::Esc => {
                         break;
@@ -225,14 +221,83 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 },
                 _ => {}
             }
-            queue!(
-                stdout,
-                cursor::MoveTo(prev_pos.x as u16, prev_pos.y as u16),
-                style::PrintStyledContent(" ".black()),
-                cursor::MoveTo(pos.x as u16, pos.y as u16),
-                style::PrintStyledContent("@".cyan())
-            )?;
         }
+
+        if tick {
+            tick = false;
+            state.score -= 1;
+
+            queue_score_draw(stdout, &state)?;
+
+            if move_queue.len() > 0 {
+                let prev_pos = pos;
+                match move_queue.pop_front() {
+                    Some(Direction::Left) => {
+                        if pos.x - 1 > 0 {
+                            pos += Direction::Left;
+                        }
+                    }
+                    Some(Direction::Right) => {
+                        if pos.x + 2 < cols as i32 {
+                            pos += Direction::Right;
+                        }
+                    }
+                    Some(Direction::Up) => {
+                        if pos.y - 1 > 0 {
+                            pos += Direction::Up;
+                        }
+                    }
+                    Some(Direction::Down) => {
+                        if pos.y + 2 < rows as i32 {
+                            pos += Direction::Down;
+                        }
+                    }
+                    _ => {}
+                }
+
+                queue!(
+                    stdout,
+                    cursor::MoveTo(prev_pos.x as u16, prev_pos.y as u16),
+                    style::PrintStyledContent(" ".black()),
+                    cursor::MoveTo(pos.x as u16, pos.y as u16),
+                    style::PrintStyledContent("@".cyan())
+                )?;
+            }
+
+            let monsters_len = state.monsters.len();
+
+            for monster_ix in (0..monsters_len).rev() {
+                let mut monster = state.monsters.remove(monster_ix);
+                let new_pos = monster.seek(state.player.location, ticker);
+
+                let mut collision = false;
+
+                for other_ix in 0..(monsters_len-1) {
+                    let other_monster = &state.monsters[other_ix];
+                    if other_monster.coord() == monster.coord() {
+                        collision = true;
+                        break;
+                    }
+                }
+
+                if !collision {
+                    monster.step(new_pos);
+                }
+
+                if monster.coord() == pos {
+                    state.score = 0;
+                    exit = true;
+                    break;
+                }
+
+                state.monsters.push(monster);
+            }
+
+            queue_monsters_draw(stdout, &state)?;
+        }
+
+        queue_clock_draw(stdout, &state)?;
+
         stdout.flush()?;
 
         if pos.x == 1 && pos.y == 1 || exit {

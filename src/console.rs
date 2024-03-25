@@ -2,15 +2,34 @@ pub mod coord;
 
 use crossterm::style::Color;
 
-use crate::{Coord, Monster};
+use crate::{Coord, Player, Unit};
 
 pub trait ConsoleUnit {
     fn color(&self) -> Color;
     fn symbol(&self) -> char;
     fn coord(&self) -> Coord;
+    fn last_coord(&self) -> Coord;
 }
 
-impl ConsoleUnit for Monster {
+impl ConsoleUnit for Player {
+    fn color(&self) -> Color {
+        Color::Cyan
+    }
+
+    fn symbol(&self) -> char {
+        '@'
+    }
+
+    fn coord(&self) -> Coord {
+        self.location.as_coord()
+    }
+
+    fn last_coord(&self) -> Coord {
+        self.last_coord
+    }
+}
+
+impl ConsoleUnit for Unit {
     fn color(&self) -> Color {
         match self.id % 11 {
             0 => Color::Grey,
@@ -40,5 +59,9 @@ impl ConsoleUnit for Monster {
 
     fn coord(&self) -> Coord {
         self.location.as_coord()
+    }
+    
+    fn last_coord(&self) -> Coord {
+        self.last_coord
     }
 }

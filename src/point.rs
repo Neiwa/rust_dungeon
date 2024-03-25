@@ -13,12 +13,20 @@ impl Point {
         Self { x, y }
     }
 
-    pub fn normalize(&self) -> Point {
+    pub fn normalize_max(&self, max: f64) -> Point {
         if self.x == 0.0 && self.y == 0.0 {
             return *self;
         }
-        let fac = 1.0 / (self.x.powi(2) + self.y.powi(2)).sqrt();
-        Point::new(self.x * fac, self.y * fac)
+        let len = (self.x.powi(2) + self.y.powi(2)).sqrt();
+        if len <= max {
+            return *self;
+        }
+        let fac = max / len;
+        *self * fac
+    }
+
+    pub fn normalize(&self) -> Point {
+        self.normalize_max(1.0)
     }
 }
 
@@ -47,6 +55,17 @@ impl ops::Mul<i32> for Point {
         Point {
             x: self.x * f64::from(rhs),
             y: self.y * f64::from(rhs),
+        }
+    }
+}
+
+impl ops::Mul<f64> for Point {
+    type Output = Point;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Point {
+            x: self.x * rhs,
+            y: self.y * rhs,
         }
     }
 }

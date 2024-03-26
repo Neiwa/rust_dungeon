@@ -3,9 +3,8 @@ use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
     execute, queue,
-    style::{self, Color, Stylize},
-    terminal,
-    terminal::{size, SetSize},
+    style::{self, style, Color, Stylize},
+    terminal::{self, size, SetSize},
 };
 use std::{
     collections::VecDeque,
@@ -150,6 +149,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     cursor::MoveTo(x as u16, y as u16),
                     style::PrintStyledContent("█".magenta())
                 )?;
+            } else if x == 1 && y == 1 {
+                queue!(
+                    stdout,
+                    cursor::MoveTo(x as u16, y as u16),
+                    style::PrintStyledContent("#".green())
+                )?;
             }
         }
     }
@@ -165,6 +170,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut tick = false;
     let mut exit = false;
     let mut move_queue: VecDeque<Direction> = VecDeque::new();
+    let move_queue_max = 2;
 
     loop {
         let elapsed = state.start.elapsed();
@@ -182,25 +188,25 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     ..
                 }) => match code {
                     KeyCode::Left => {
-                        if move_queue.len() > 2 {
+                        if move_queue.len() > move_queue_max {
                             move_queue.pop_back();
                         }
                         move_queue.push_back(Direction::Left);
                     }
                     KeyCode::Right => {
-                        if move_queue.len() > 2 {
+                        if move_queue.len() > move_queue_max {
                             move_queue.pop_back();
                         }
                         move_queue.push_back(Direction::Right);
                     }
                     KeyCode::Up => {
-                        if move_queue.len() > 2 {
+                        if move_queue.len() > move_queue_max {
                             move_queue.pop_back();
                         }
                         move_queue.push_back(Direction::Up);
                     }
                     KeyCode::Down => {
-                        if move_queue.len() > 2 {
+                        if move_queue.len() > move_queue_max {
                             move_queue.pop_back();
                         }
                         move_queue.push_back(Direction::Down);
@@ -227,23 +233,30 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 match move_queue.pop_front() {
                     Some(Direction::Left) => {
                         if prev_pos.x - 1 > 0 {
-                            state.player.step(state.player.location + Direction::Left.as_point());
+                            state
+                                .player
+                                .step(state.player.location + Direction::Left.as_point());
                         }
                     }
                     Some(Direction::Right) => {
                         if prev_pos.x + 2 < cols as i32 {
-                            state.player.step(state.player.location + Direction::Right.as_point());
+                            state
+                                .player
+                                .step(state.player.location + Direction::Right.as_point());
                         }
                     }
                     Some(Direction::Up) => {
                         if prev_pos.y - 1 > 0 {
-                            state.player.step(state.player.location + Direction::Up.as_point());
-
+                            state
+                                .player
+                                .step(state.player.location + Direction::Up.as_point());
                         }
                     }
                     Some(Direction::Down) => {
                         if prev_pos.y + 2 < rows as i32 {
-                            state.player.step(state.player.location + Direction::Down.as_point());
+                            state
+                                .player
+                                .step(state.player.location + Direction::Down.as_point());
                         }
                     }
                     _ => {}
@@ -266,7 +279,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
                 let mut collision = false;
 
-                for other_ix in 0..(monsters_len-1) {
+                for other_ix in 0..(monsters_len - 1) {
                     let other_monster = &state.monsters[other_ix];
                     if other_monster.coord() == new_pos.as_coord() {
                         collision = true;

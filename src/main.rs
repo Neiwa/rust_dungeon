@@ -7,11 +7,9 @@ use crossterm::{
     terminal,
     terminal::{size, SetSize},
 };
-use point::Point;
 use std::{
     collections::VecDeque,
     io::{self, Write},
-    ops::Deref,
     time::{Duration, Instant},
 };
 
@@ -161,11 +159,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     stdout.flush()?;
 
-    let mut pos = Coord {
-        x: (cols as i32 / 2),
-        y: (rows as i32 / 2),
-    };
-
     queue_unit_draw(stdout, &state.player)?;
 
     let mut last_tick: u128 = 0;
@@ -230,26 +223,27 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             queue_score_draw(stdout, &state)?;
 
             if move_queue.len() > 0 {
-                let prev_pos = pos;
+                let prev_pos = state.player.location.as_coord();
                 match move_queue.pop_front() {
                     Some(Direction::Left) => {
-                        if pos.x - 1 > 0 {
-                            pos += Direction::Left;
+                        if prev_pos.x - 1 > 0 {
+                            state.player.step(state.player.location + Direction::Left.as_point());
                         }
                     }
                     Some(Direction::Right) => {
-                        if pos.x + 2 < cols as i32 {
-                            pos += Direction::Right;
+                        if prev_pos.x + 2 < cols as i32 {
+                            state.player.step(state.player.location + Direction::Right.as_point());
                         }
                     }
                     Some(Direction::Up) => {
-                        if pos.y - 1 > 0 {
-                            pos += Direction::Up;
+                        if prev_pos.y - 1 > 0 {
+                            state.player.step(state.player.location + Direction::Up.as_point());
+
                         }
                     }
                     Some(Direction::Down) => {
-                        if pos.y + 2 < rows as i32 {
-                            pos += Direction::Down;
+                        if prev_pos.y + 2 < rows as i32 {
+                            state.player.step(state.player.location + Direction::Down.as_point());
                         }
                     }
                     _ => {}
@@ -259,7 +253,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     stdout,
                     cursor::MoveTo(prev_pos.x as u16, prev_pos.y as u16),
                     style::PrintStyledContent(" ".black()),
-                    cursor::MoveTo(pos.x as u16, pos.y as u16),
+                    cursor::MoveTo(state.player.coord().x as u16, state.player.coord().y as u16),
                     style::PrintStyledContent("@".cyan())
                 )?;
             }
@@ -274,7 +268,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
                 for other_ix in 0..(monsters_len-1) {
                     let other_monster = &state.monsters[other_ix];
-                    if other_monster.coord() == monster.coord() {
+                    if other_monster.coord() == new_pos.as_coord() {
                         collision = true;
                         break;
                     }
@@ -284,7 +278,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     monster.step(new_pos);
                 }
 
-                if monster.coord() == pos {
+                if monster.coord() == state.player.coord() {
                     state.score = 0;
                     exit = true;
                     break;
@@ -300,7 +294,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         stdout.flush()?;
 
-        if pos.x == 1 && pos.y == 1 || exit {
+        if state.player.coord() == Coord::new(1, 1) || exit {
             break;
         }
     }

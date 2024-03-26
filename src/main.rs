@@ -262,13 +262,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     _ => {}
                 }
 
-                queue!(
-                    stdout,
-                    cursor::MoveTo(prev_pos.x as u16, prev_pos.y as u16),
-                    style::PrintStyledContent(" ".black()),
-                    cursor::MoveTo(state.player.coord().x as u16, state.player.coord().y as u16),
-                    style::PrintStyledContent("@".cyan())
-                )?;
+                queue_unit_draw(stdout, &state.player)?;
             }
 
             let monsters_len = state.monsters.len();

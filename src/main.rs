@@ -3,11 +3,11 @@ use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
     execute, queue,
-    style::{self, style, Color, Stylize},
+    style::{self, Color, Stylize},
     terminal::{self, size, SetSize},
 };
 use std::{
-    collections::VecDeque,
+    collections::HashMap,
     io::{self, Write},
     time::{Duration, Instant},
 };
@@ -20,11 +20,19 @@ use crate::unit::*;
 
 struct State {
     score: i32,
-    clock_coord: Coord,
-    score_coord: Coord,
     start: Instant,
     monsters: Vec<unit::Unit>,
     player: Player,
+}
+
+struct Display<'a> {
+    status_indicators: HashMap<&'a str, Indicator>,
+}
+
+struct Indicator {
+    coord: Coord,
+    color: Color,
+    bg_color: Color,
 }
 
 fn main() -> io::Result<()> {
@@ -60,29 +68,22 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn queue_clock_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()> {
+fn queue_value_draw(
+    stdout: &mut io::Stdout,
+    indicator: Option<&Indicator>,
+    value: String,
+) -> io::Result<()> {
+
+    if indicator.is_none() {
+        return Ok(())
+    }
+
+    let ind = indicator.unwrap();
+
     queue!(
         stdout,
-        cursor::MoveTo(state.clock_coord.x as u16, state.clock_coord.y as u16),
-        style::PrintStyledContent(
-            format!("{:>3}", state.start.elapsed().as_secs())
-                .with(Color::White)
-                .on(Color::Magenta)
-        ),
-    )?;
-
-    Ok(())
-}
-
-fn queue_score_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()> {
-    queue!(
-        stdout,
-        cursor::MoveTo(state.score_coord.x as u16, state.score_coord.y as u16),
-        style::PrintStyledContent(
-            format!("{:>3}", state.score)
-                .with(Color::White)
-                .on(Color::Magenta)
-        ),
+        cursor::MoveTo(ind.coord.x as u16, ind.coord.y as u16),
+        style::PrintStyledContent(value.with(ind.color).on(ind.bg_color)),
     )?;
 
     Ok(())
@@ -116,8 +117,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut state = State {
         start: Instant::now(),
         score: 100,
-        clock_coord: Coord::new(cols as i32 - 5, 0),
-        score_coord: Coord::new(5, 0),
         player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2)),
         monsters: vec![
             Unit::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
@@ -133,6 +132,35 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 Some(500),
             ),
         ],
+    };
+
+    let display = Display {
+        status_indicators: HashMap::from([
+            (
+                "clock",
+                Indicator {
+                    coord: Coord::new(cols as i32 - 5, 0),
+                    color: Color::White,
+                    bg_color: Color::Magenta,
+                },
+            ),
+            (
+                "score",
+                Indicator {
+                    coord: Coord::new(5, 0),
+                    color: Color::White,
+                    bg_color: Color::Magenta,
+                },
+            ),
+            (
+                "player_pos",
+                Indicator {
+                    coord: Coord::new(5, rows as i32 - 1),
+                    color: Color::White,
+                    bg_color: Color::Magenta,
+                },
+            ),
+        ]),
     };
 
     state.monsters.push(Unit::new(
@@ -158,19 +186,26 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             }
         }
     }
-    queue_clock_draw(stdout, &state)?;
-    queue_score_draw(stdout, &state)?;
+    queue_value_draw(
+        stdout,
+        display.status_indicators.get("clock"),
+        format!("{:>3}", state.start.elapsed().as_secs()),
+    )?;
+    queue_value_draw(
+        stdout,
+        display.status_indicators.get("score"),
+        format!("{:>3}", state.score),
+    )?;
     queue_monsters_draw(stdout, &state)?;
 
-    stdout.flush()?;
-
     queue_unit_draw(stdout, &state.player)?;
+
+    stdout.flush()?;
 
     let mut last_tick: u128 = 0;
     let mut tick = false;
     let mut exit = false;
-    let mut move_queue: VecDeque<Direction> = VecDeque::new();
-    let move_queue_max = 2;
+    let mut player_moved = false;
 
     loop {
         let elapsed = state.start.elapsed();
@@ -178,9 +213,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         if ticker > last_tick {
             last_tick = ticker;
             tick = true;
+            player_moved = false;
         }
 
-        if poll(Duration::from_millis(50))? {
+        if poll(Duration::from_millis(0))? {
+            let mut step: Option<Direction> = None;
+
             match read()? {
                 Event::Key(KeyEvent {
                     code,
@@ -188,28 +226,16 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     ..
                 }) => match code {
                     KeyCode::Left => {
-                        if move_queue.len() > move_queue_max {
-                            move_queue.pop_back();
-                        }
-                        move_queue.push_back(Direction::Left);
+                        step = Some(Direction::Left);
                     }
                     KeyCode::Right => {
-                        if move_queue.len() > move_queue_max {
-                            move_queue.pop_back();
-                        }
-                        move_queue.push_back(Direction::Right);
+                        step = Some(Direction::Right);
                     }
                     KeyCode::Up => {
-                        if move_queue.len() > move_queue_max {
-                            move_queue.pop_back();
-                        }
-                        move_queue.push_back(Direction::Up);
+                        step = Some(Direction::Up);
                     }
                     KeyCode::Down => {
-                        if move_queue.len() > move_queue_max {
-                            move_queue.pop_back();
-                        }
-                        move_queue.push_back(Direction::Down);
+                        step = Some(Direction::Down);
                     }
                     KeyCode::Esc => {
                         break;
@@ -220,17 +246,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 },
                 _ => {}
             }
-        }
 
-        if tick {
-            tick = false;
-            state.score -= 1;
-
-            queue_score_draw(stdout, &state)?;
-
-            if move_queue.len() > 0 {
+            if !player_moved && step.is_some() {
                 let prev_pos = state.player.location.as_coord();
-                match move_queue.pop_front() {
+                match step {
                     Some(Direction::Left) => {
                         if prev_pos.x - 1 > 0 {
                             state
@@ -263,7 +282,24 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 }
 
                 queue_unit_draw(stdout, &state.player)?;
+                queue_value_draw(
+                    stdout,
+                    display.status_indicators.get("player_pos"),
+                    format!("{} {}", state.player.coord().x, state.player.coord().y),
+                )?;
+                player_moved = true;
             }
+        }
+
+        if tick {
+            tick = false;
+            state.score -= 1;
+
+            queue_value_draw(
+                stdout,
+                display.status_indicators.get("score"),
+                format!("{:>3}", state.score),
+            )?;
 
             let monsters_len = state.monsters.len();
 
@@ -297,7 +333,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             queue_monsters_draw(stdout, &state)?;
         }
 
-        queue_clock_draw(stdout, &state)?;
+        queue_value_draw(
+            stdout,
+            display.status_indicators.get("clock"),
+            format!("{:>3}", state.start.elapsed().as_secs()),
+        )?;
 
         stdout.flush()?;
 

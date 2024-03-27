@@ -1,3 +1,4 @@
+use action::Action;
 use console::ConsoleUnit;
 use crossterm::{
     cursor,
@@ -7,11 +8,12 @@ use crossterm::{
     terminal::{self, size, SetSize},
 };
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     io::{self, Write},
     time::{Duration, Instant},
 };
 
+mod action;
 mod console;
 pub mod point;
 mod unit;
@@ -73,9 +75,8 @@ fn queue_value_draw(
     indicator: Option<&Indicator>,
     value: String,
 ) -> io::Result<()> {
-
     if indicator.is_none() {
-        return Ok(())
+        return Ok(());
     }
 
     let ind = indicator.unwrap();
@@ -97,6 +98,25 @@ fn queue_unit_draw(stdout: &mut io::Stdout, unit: &dyn ConsoleUnit) -> io::Resul
         cursor::MoveTo(unit.coord().x as u16, unit.coord().y as u16),
         style::PrintStyledContent(unit.symbol().with(unit.color())),
     )?;
+
+    Ok(())
+}
+
+fn queue_action_draw(stdout: &mut io::Stdout, action: Action) -> io::Result<()> {
+    match action {
+        Action::Move {
+            symbol,
+            color,
+            old,
+            new,
+        } => queue!(
+            stdout,
+            cursor::MoveTo(old.x as u16, old.y as u16),
+            style::PrintStyledContent(" ".black()),
+            cursor::MoveTo(new.x as u16, new.y as u16),
+            style::PrintStyledContent(symbol.with(color)),
+        )?,
+    }
 
     Ok(())
 }
@@ -160,6 +180,14 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     bg_color: Color::Magenta,
                 },
             ),
+            (
+                "ticker",
+                Indicator {
+                    coord: Coord::new(cols as i32 - 5, rows as i32 - 1),
+                    color: Color::White,
+                    bg_color: Color::Magenta,
+                },
+            ),
         ]),
     };
 
@@ -202,7 +230,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     stdout.flush()?;
 
-    let mut last_tick: u128 = 0;
+    let mut last_tick = 0;
     let mut tick = false;
     let mut exit = false;
     let mut player_moved = false;
@@ -216,13 +244,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             player_moved = false;
         }
 
+        let mut actions: VecDeque<Action> = VecDeque::new();
+
         if poll(Duration::from_millis(0))? {
             let mut step: Option<Direction> = None;
 
             match read()? {
                 Event::Key(KeyEvent {
                     code,
-                    kind: event::KeyEventKind::Press,
+                    kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat,
                     ..
                 }) => match code {
                     KeyCode::Left => {
@@ -240,9 +270,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     KeyCode::Esc => {
                         break;
                     }
-                    _ => {
-                        continue;
-                    }
+                    _ => {}
                 },
                 _ => {}
             }
@@ -281,12 +309,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     _ => {}
                 }
 
-                queue_unit_draw(stdout, &state.player)?;
-                queue_value_draw(
-                    stdout,
-                    display.status_indicators.get("player_pos"),
-                    format!("{} {}", state.player.coord().x, state.player.coord().y),
-                )?;
+                actions.push_back(Action::Move {
+                    symbol: state.player.symbol(),
+                    color: state.player.color(),
+                    old: prev_pos,
+                    new: state.player.coord(),
+                });
                 player_moved = true;
             }
         }
@@ -294,12 +322,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         if tick {
             tick = false;
             state.score -= 1;
-
-            queue_value_draw(
-                stdout,
-                display.status_indicators.get("score"),
-                format!("{:>3}", state.score),
-            )?;
 
             let monsters_len = state.monsters.len();
 
@@ -318,7 +340,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 }
 
                 if !collision {
+                    let prev_pos = monster.coord();
                     monster.step(new_pos);
+                    
+                    actions.push_back(Action::Move {
+                        symbol: monster.symbol(),
+                        color: monster.color(),
+                        old: prev_pos,
+                        new: new_pos.as_coord(),
+                    });
                 }
 
                 if monster.coord() == state.player.coord() {
@@ -329,17 +359,39 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
                 state.monsters.push(monster);
             }
-
-            queue_monsters_draw(stdout, &state)?;
         }
 
-        queue_value_draw(
-            stdout,
-            display.status_indicators.get("clock"),
-            format!("{:>3}", state.start.elapsed().as_secs()),
-        )?;
+        if actions.len() > 0 {
+            while let Some(action) = actions.pop_front() {
+                queue_action_draw(stdout, action)?;
+            }
+                
+            queue_value_draw(
+                stdout,
+                display.status_indicators.get("player_pos"),
+                format!("{:?}", state.player.coord()),
+            )?;
 
-        stdout.flush()?;
+            queue_value_draw(
+                stdout,
+                display.status_indicators.get("clock"),
+                format!("{:>3}", elapsed.as_secs()),
+            )?;
+
+            queue_value_draw(
+                stdout,
+                display.status_indicators.get("score"),
+                format!("{:>3}", state.score),
+            )?;
+
+            queue_value_draw(
+                stdout,
+                display.status_indicators.get("ticker"),
+                format!("{:>3}", ticker),
+            )?;
+
+            stdout.flush()?;
+        }
 
         if state.player.coord() == Coord::new(1, 1) || exit {
             break;

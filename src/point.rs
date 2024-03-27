@@ -24,10 +24,6 @@ impl Point {
         let fac = max / len;
         *self * fac
     }
-
-    pub fn normalize(&self) -> Point {
-        self.normalize_max(1.0)
-    }
 }
 
 impl ops::Add<Point> for Point {

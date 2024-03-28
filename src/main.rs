@@ -140,11 +140,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         score: 100,
         player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2)),
         monsters: vec![
-            Unit::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
-            Unit::new(
-                Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
-                Some(40),
-            ),
+            // Unit::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
+            // Unit::new(
+            //     Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
+            //     Some(40),
+            // ),
             Unit::new(
                 Coord::new(
                     cols as i32 / 4 + cols as i32 / 2,
@@ -152,6 +152,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 ),
                 Some(500),
             ),
+            // Unit::new(
+            //     Coord::new(cols as i32 / 4, rows as i32 / 4 + rows as i32 / 2),
+            //     Some(200),
+            // ),
         ],
     };
 
@@ -192,11 +196,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         ]),
     };
 
-    state.monsters.push(Unit::new(
-        Coord::new(cols as i32 / 4, rows as i32 / 4 + rows as i32 / 2),
-        Some(200),
-    ));
-
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     for y in 0..rows {
         for x in 0..cols {
@@ -235,8 +234,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut tick = false;
     let mut exit = false;
     let mut player_moved = false;
-    let mut current_input: Option<Direction> = None;
-    let mut keys_down = 0;
+    let mut input_stack: Vec<Direction> = Vec::new();
     let mut missed_move_ticks = 0;
 
     let mut events = Vec::new();
@@ -258,31 +256,23 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 Ok(Event::Key(KeyEvent { code, kind, .. })) => match kind {
                     event::KeyEventKind::Press => match code {
                         KeyCode::Left => {
-                            if let Some(Direction::Left) = current_input {
-                            } else {
-                                current_input = Some(Direction::Left);
-                                keys_down += 1;
+                            if !input_stack.contains(&Direction::Left) {
+                                input_stack.push(Direction::Left);
                             }
                         }
                         KeyCode::Right => {
-                            if let Some(Direction::Right) = current_input {
-                            } else {
-                                current_input = Some(Direction::Right);
-                                keys_down += 1;
+                            if !input_stack.contains(&Direction::Right) {
+                                input_stack.push(Direction::Right);
                             }
                         }
                         KeyCode::Up => {
-                            if let Some(Direction::Up) = current_input {
-                            } else {
-                                current_input = Some(Direction::Up);
-                                keys_down += 1;
+                            if !input_stack.contains(&Direction::Up) {
+                                input_stack.push(Direction::Up);
                             }
                         }
                         KeyCode::Down => {
-                            if let Some(Direction::Down) = current_input {
-                            } else {
-                                current_input = Some(Direction::Down);
-                                keys_down += 1;
+                            if !input_stack.contains(&Direction::Down) {
+                                input_stack.push(Direction::Down);
                             }
                         }
                         KeyCode::Esc => {
@@ -291,10 +281,24 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         _ => {}
                     },
                     event::KeyEventKind::Release => match code {
-                        KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down => {
-                            keys_down -= 1;
-                            if keys_down == 0 {
-                                current_input = None;
+                        KeyCode::Left => {
+                            if input_stack.contains(&Direction::Left) {
+                                input_stack.retain(|&d| d != Direction::Left);
+                            }
+                        }
+                        KeyCode::Right => {
+                            if input_stack.contains(&Direction::Right) {
+                                input_stack.retain(|&d| d != Direction::Right);
+                            }
+                        }
+                        KeyCode::Up => {
+                            if input_stack.contains(&Direction::Up) {
+                                input_stack.retain(|&d| d != Direction::Up);
+                            }
+                        }
+                        KeyCode::Down => {
+                            if input_stack.contains(&Direction::Down) {
+                                input_stack.retain(|&d| d != Direction::Down);
                             }
                         }
                         _ => {}
@@ -303,12 +307,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 },
                 _ => {}
             }
-            events.push((elapsed, ticker, format!("{:?} {}", event?, keys_down)));
+            events.push((elapsed, ticker, format!("{:?} {:?}", event?, input_stack)));
         }
 
-        if !player_moved && current_input.is_some() {
+        if !player_moved && input_stack.len() > 0 {
             let prev_pos = state.player.location.as_coord();
-            match current_input.unwrap() {
+            match input_stack.last().unwrap() {
                 Direction::Left => {
                     if prev_pos.x - 1 > 0 {
                         state

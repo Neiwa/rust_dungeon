@@ -48,7 +48,7 @@ impl ops::AddAssign<Coord> for Coord {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Direction {
     Up,
     Down,

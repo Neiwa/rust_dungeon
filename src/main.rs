@@ -312,35 +312,49 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         if !player_moved && input_stack.len() > 0 {
             let prev_pos = state.player.location.as_coord();
-            match input_stack.last().unwrap() {
-                Direction::Left => {
-                    if prev_pos.x - 1 > 0 {
-                        state
-                            .player
-                            .step(state.player.location + Direction::Left.as_point());
-                    }
+            
+            match (input_stack.last(), input_stack.get(input_stack.len().checked_sub(2).unwrap_or(20))) {
+                (Some(Direction::Up), Some(Direction::Left)) | (Some(Direction::Left), Some(Direction::Up)) if prev_pos.x - 1 > 0 && prev_pos.y - 1 > 0 => {
+                    state
+                        .player
+                        .step(state.player.location + (Direction::Left.as_point() + Direction::Up.as_point()).normalize_max(1.0));
                 }
-                Direction::Right => {
-                    if prev_pos.x + 2 < cols as i32 {
-                        state
-                            .player
-                            .step(state.player.location + Direction::Right.as_point());
-                    }
+                (Some(Direction::Left), Some(Direction::Down)) | (Some(Direction::Down), Some(Direction::Left)) if prev_pos.x - 1 > 0 && prev_pos.y + 2 < rows as i32 => {
+                    state
+                        .player
+                        .step(state.player.location + (Direction::Left.as_point() + Direction::Down.as_point()).normalize_max(1.0));
                 }
-                Direction::Up => {
-                    if prev_pos.y - 1 > 0 {
-                        state
-                            .player
-                            .step(state.player.location + Direction::Up.as_point());
-                    }
+                (Some(Direction::Up), Some(Direction::Right)) | (Some(Direction::Right), Some(Direction::Up)) if prev_pos.x + 2 < cols as i32 && prev_pos.y - 1 > 0 => {
+                    state
+                        .player
+                        .step(state.player.location + (Direction::Right.as_point() + Direction::Up.as_point()).normalize_max(1.0));
                 }
-                Direction::Down => {
-                    if prev_pos.y + 2 < rows as i32 {
-                        state
-                            .player
-                            .step(state.player.location + Direction::Down.as_point());
-                    }
+                (Some(Direction::Right), Some(Direction::Down)) | (Some(Direction::Down), Some(Direction::Right)) if prev_pos.x + 2 < cols as i32 && prev_pos.y + 2 < rows as i32 => {
+                    state
+                        .player
+                        .step(state.player.location + (Direction::Right.as_point() + Direction::Down.as_point()).normalize_max(1.0));
                 }
+                (Some(Direction::Left), _) if prev_pos.x - 1 > 0 => {
+                    state
+                        .player
+                        .step(state.player.location + Direction::Left.as_point());
+                }
+                (Some(Direction::Right), _) if prev_pos.x + 2 < cols as i32 => {
+                    state
+                        .player
+                        .step(state.player.location + Direction::Right.as_point());
+                }
+                (Some(Direction::Up), _) if prev_pos.y - 1 > 0 => {
+                    state
+                        .player
+                        .step(state.player.location + Direction::Up.as_point());
+                }
+                (Some(Direction::Down), _) if prev_pos.y + 2 < rows as i32 => {
+                    state
+                        .player
+                        .step(state.player.location + Direction::Down.as_point());
+                }
+                _ => {}
             }
 
             actions.push_back(Action::Move {

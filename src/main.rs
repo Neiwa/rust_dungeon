@@ -9,6 +9,7 @@ use crossterm::{
 };
 use std::{
     collections::{HashMap, VecDeque},
+    fs::File,
     io::{self, Write},
     time::{Duration, Instant},
 };
@@ -234,6 +235,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut tick = false;
     let mut exit = false;
     let mut player_moved = false;
+    let mut current_input: Option<Direction> = None;
+    let mut keys_down = 0;
+    let mut missed_move_ticks = 0;
+
+    let mut events = Vec::new();
 
     loop {
         let elapsed = state.start.elapsed();
@@ -247,81 +253,109 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         let mut actions: VecDeque<Action> = VecDeque::new();
 
         if poll(Duration::from_millis(0))? {
-            let mut step: Option<Direction> = None;
-
-            match read()? {
-                Event::Key(KeyEvent {
-                    code,
-                    kind: event::KeyEventKind::Press | event::KeyEventKind::Repeat,
-                    ..
-                }) => match code {
-                    KeyCode::Left => {
-                        step = Some(Direction::Left);
-                    }
-                    KeyCode::Right => {
-                        step = Some(Direction::Right);
-                    }
-                    KeyCode::Up => {
-                        step = Some(Direction::Up);
-                    }
-                    KeyCode::Down => {
-                        step = Some(Direction::Down);
-                    }
-                    KeyCode::Esc => {
-                        break;
-                    }
-                    _ => {}
+            let event = read();
+            match event {
+                Ok(Event::Key(KeyEvent { code, kind, .. })) => match kind {
+                    event::KeyEventKind::Press => match code {
+                        KeyCode::Left => {
+                            if let Some(Direction::Left) = current_input {
+                            } else {
+                                current_input = Some(Direction::Left);
+                                keys_down += 1;
+                            }
+                        }
+                        KeyCode::Right => {
+                            if let Some(Direction::Right) = current_input {
+                            } else {
+                                current_input = Some(Direction::Right);
+                                keys_down += 1;
+                            }
+                        }
+                        KeyCode::Up => {
+                            if let Some(Direction::Up) = current_input {
+                            } else {
+                                current_input = Some(Direction::Up);
+                                keys_down += 1;
+                            }
+                        }
+                        KeyCode::Down => {
+                            if let Some(Direction::Down) = current_input {
+                            } else {
+                                current_input = Some(Direction::Down);
+                                keys_down += 1;
+                            }
+                        }
+                        KeyCode::Esc => {
+                            break;
+                        }
+                        _ => {}
+                    },
+                    event::KeyEventKind::Release => match code {
+                        KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down => {
+                            keys_down -= 1;
+                            if keys_down == 0 {
+                                current_input = None;
+                            }
+                        }
+                        _ => {}
+                    },
+                    event::KeyEventKind::Repeat => {}
                 },
                 _ => {}
             }
+            events.push((elapsed, ticker, format!("{:?} {}", event?, keys_down)));
+        }
 
-            if !player_moved && step.is_some() {
-                let prev_pos = state.player.location.as_coord();
-                match step {
-                    Some(Direction::Left) => {
-                        if prev_pos.x - 1 > 0 {
-                            state
-                                .player
-                                .step(state.player.location + Direction::Left.as_point());
-                        }
+        if !player_moved && current_input.is_some() {
+            let prev_pos = state.player.location.as_coord();
+            match current_input.unwrap() {
+                Direction::Left => {
+                    if prev_pos.x - 1 > 0 {
+                        state
+                            .player
+                            .step(state.player.location + Direction::Left.as_point());
                     }
-                    Some(Direction::Right) => {
-                        if prev_pos.x + 2 < cols as i32 {
-                            state
-                                .player
-                                .step(state.player.location + Direction::Right.as_point());
-                        }
-                    }
-                    Some(Direction::Up) => {
-                        if prev_pos.y - 1 > 0 {
-                            state
-                                .player
-                                .step(state.player.location + Direction::Up.as_point());
-                        }
-                    }
-                    Some(Direction::Down) => {
-                        if prev_pos.y + 2 < rows as i32 {
-                            state
-                                .player
-                                .step(state.player.location + Direction::Down.as_point());
-                        }
-                    }
-                    _ => {}
                 }
-
-                actions.push_back(Action::Move {
-                    symbol: state.player.symbol(),
-                    color: state.player.color(),
-                    old: prev_pos,
-                    new: state.player.coord(),
-                });
-                player_moved = true;
+                Direction::Right => {
+                    if prev_pos.x + 2 < cols as i32 {
+                        state
+                            .player
+                            .step(state.player.location + Direction::Right.as_point());
+                    }
+                }
+                Direction::Up => {
+                    if prev_pos.y - 1 > 0 {
+                        state
+                            .player
+                            .step(state.player.location + Direction::Up.as_point());
+                    }
+                }
+                Direction::Down => {
+                    if prev_pos.y + 2 < rows as i32 {
+                        state
+                            .player
+                            .step(state.player.location + Direction::Down.as_point());
+                    }
+                }
             }
+
+            actions.push_back(Action::Move {
+                symbol: state.player.symbol(),
+                color: state.player.color(),
+                old: prev_pos,
+                new: state.player.coord(),
+            });
+            player_moved = true;
         }
 
         if tick {
             tick = false;
             state.score -= 1;
+
+            if !player_moved {
+                missed_move_ticks += 1;
+                events.push((elapsed, ticker, String::from("MissedMove")));
+            }
 
             let monsters_len = state.monsters.len();
 
@@ -342,7 +376,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 if !collision {
                     let prev_pos = monster.coord();
                     monster.step(new_pos);
-                    
+
                     actions.push_back(Action::Move {
                         symbol: monster.symbol(),
                         color: monster.color(),
@@ -365,7 +399,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             while let Some(action) = actions.pop_front() {
                 queue_action_draw(stdout, action)?;
             }
-                
+
             queue_value_draw(
                 stdout,
                 display.status_indicators.get("player_pos"),
@@ -387,7 +421,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             queue_value_draw(
                 stdout,
                 display.status_indicators.get("ticker"),
-                format!("{:>3}", ticker),
+                format!("{:>3}", missed_move_ticks),
             )?;
 
             stdout.flush()?;
@@ -396,6 +430,16 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         if state.player.coord() == Coord::new(1, 1) || exit {
             break;
         }
+    }
+
+    let mut file = File::create("rust_dungeon.log")?;
+    for (duration, ticker, log) in events {
+        file.write_fmt(format_args!(
+            "{:>10}\t{:>3}\t{:}\n",
+            duration.as_millis(),
+            ticker,
+            log
+        ))?;
     }
 
     Ok(state.score)

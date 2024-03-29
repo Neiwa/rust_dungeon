@@ -1,6 +1,6 @@
 use std::ops;
 
-use crate::point::Point;
+use crate::point::{AsPoint, Point};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Coord {
@@ -12,20 +12,26 @@ impl Coord {
     pub fn new(x: i32, y: i32) -> Self {
         Self { x, y }
     }
+}
 
-    pub fn as_point(&self) -> Point {
-        Point {
-            x: self.x as f64,
-            y: self.y as f64,
+pub trait AsCoord {
+    fn as_coord(&self) -> Coord;
+}
+
+impl AsCoord for Point {
+    fn as_coord(&self) -> Coord {
+        Coord {
+            x: self.x.round() as i32,
+            y: self.y.round() as i32,
         }
     }
 }
 
-impl Point {
-    pub fn as_coord(&self) -> Coord {
-        Coord {
-            x: self.x.round() as i32,
-            y: self.y.round() as i32,
+impl AsPoint for Coord {
+    fn as_point(&self) -> Point {
+        Point {
+            x: self.x as f64,
+            y: self.y as f64,
         }
     }
 }
@@ -56,8 +62,8 @@ pub enum Direction {
     Right
 }
 
-impl Direction {
-    pub fn as_coord(self) -> Coord {
+impl AsCoord for Direction {
+    fn as_coord(&self) -> Coord {
         match self {
             Self::Up => Coord::new(0, -1),
             Self::Down => Coord::new(0, 1),
@@ -65,6 +71,10 @@ impl Direction {
             Self::Right => Coord::new(1, 0),
         }
     }
+}
+
+pub trait AsDirection {
+    fn as_direction(self) -> Option<Direction>;
 }
 
 impl ops::Add<Direction> for Coord {

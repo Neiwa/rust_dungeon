@@ -1,6 +1,6 @@
 use rand::random;
 
-use crate::{point::Point, Coord, Direction};
+use crate::{point::{AsPoint, Point}, AsCoord, Coord, Direction};
 
 pub struct Player {
     pub location: Point,

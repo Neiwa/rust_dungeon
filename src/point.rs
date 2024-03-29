@@ -63,8 +63,12 @@ impl ops::Mul<f64> for Point {
     }
 }
 
-impl Direction {
-    pub fn as_point(self) -> Point {
+pub trait AsPoint {
+    fn as_point(&self) -> Point;
+}
+
+impl AsPoint for Direction {
+    fn as_point(&self) -> Point {
         match self {
             Self::Up => Point::new(0.0, -1.0),
             Self::Down => Point::new(0.0, 1.0),

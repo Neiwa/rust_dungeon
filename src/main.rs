@@ -1,5 +1,6 @@
 use action::Action;
-use console::{AsDirection, ConsoleUnit};
+use console::coord::AsDirection;
+use console::ConsoleUnit;
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -7,7 +8,8 @@ use crossterm::{
     style::{self, Color, Stylize},
     terminal::{self, size, SetSize},
 };
-use point::Point;
+use point::AsPoint;
+
 use std::{
     collections::{HashMap, VecDeque},
     fs::File,
@@ -289,14 +291,22 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         if !player_moved && input_tracker.len() > 0 {
             let prev_pos = state.player.location.as_coord();
 
-            let mut step = input_tracker.get(0).unwrap().as_direction().unwrap().as_point();
+            let mut step = input_tracker
+                .get(0)
+                .unwrap()
+                .as_direction()
+                .unwrap()
+                .as_point();
 
             if let Some(secondary_input) = input_tracker.get(1) {
-                step += secondary_input.as_direction().unwrap().as_point();
+                if let Some(direction) = secondary_input.as_direction() {
+                    step += direction.as_point();
+                }
             }
 
             let next_pos = state.player.location + step.normalize(state.player.speed());
             let next_coord = next_pos.as_coord();
+
             if next_coord.x > 0
                 && next_coord.x < cols - 1
                 && next_coord.y > 0

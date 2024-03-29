@@ -268,7 +268,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         } else {
                             match code {
                                 KeyCode::Esc => {
-                                    break;
+                                    exit = true;
                                 }
                                 _ => {}
                             }

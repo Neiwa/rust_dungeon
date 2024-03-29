@@ -256,7 +256,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut tick = false;
     let mut exit = false;
     let mut player_moved = false;
-    let mut input_tracker: VecDeque<KeyCode> = VecDeque::new();
+    let mut input_tracker: Vec<KeyCode> = Vec::new();
     let mut missed_move_ticks = 0;
 
     let mut events = Vec::new();
@@ -279,7 +279,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     event::KeyEventKind::Press => {
                         if code.as_command().is_some() {
                             if !input_tracker.contains(&code) {
-                                input_tracker.push_front(code);
+                                input_tracker.push(code);
                             }
                         } else {
                             match code {

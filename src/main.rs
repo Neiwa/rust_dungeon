@@ -8,6 +8,7 @@ use crossterm::{
     style::{self, Color, Stylize},
     terminal::{self, size, SetSize},
 };
+use fireball::Fireball;
 use point::{AsPoint, Point};
 use render_action::RenderAction;
 
@@ -20,6 +21,7 @@ use std::{
 
 mod command;
 mod console;
+mod fireball;
 pub mod point;
 mod render_action;
 mod unit;
@@ -31,6 +33,7 @@ struct State {
     start: Instant,
     monsters: Vec<unit::Unit>,
     player: Player,
+    fireballs: Vec<Fireball>,
 }
 
 struct Display<'a> {
@@ -123,6 +126,20 @@ fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Resul
             cursor::MoveTo(new.x as u16, new.y as u16),
             style::PrintStyledContent(symbol.with(color).on(BG_COLOR)),
         )?,
+        RenderAction::Remove(coord) => queue!(
+            stdout,
+            cursor::MoveTo(coord.x as u16, coord.y as u16),
+            style::PrintStyledContent(" ".with(BG_COLOR).on(BG_COLOR)),
+        )?,
+        RenderAction::Create {
+            symbol,
+            color,
+            coord,
+        } => queue!(
+            stdout,
+            cursor::MoveTo(coord.x as u16, coord.y as u16),
+            style::PrintStyledContent(symbol.with(color).on(BG_COLOR)),
+        )?,
     }
 
     Ok(())
@@ -143,8 +160,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     let mut state = State {
         start: Instant::now(),
-        score: 100,
+        score: 0,
         player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2)),
+        fireballs: Vec::new(),
         monsters: vec![
             Unit::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
             Unit::new(
@@ -254,6 +272,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     let mut last_tick = 0;
     let mut tick = false;
+    let mut last_fireball_tick = 0;
+    let mut fireball_tick = false;
+    let mut last_spawn_tick = 0;
+    let mut spawn_tick = true;
+
     let mut exit = false;
     let mut player_moved = false;
     let mut input_tracker: Vec<KeyCode> = Vec::new();
@@ -263,11 +286,21 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     loop {
         let elapsed = state.start.elapsed();
-        let ticker = elapsed.as_millis() / 200;
-        if ticker > last_tick {
-            last_tick = ticker;
+        let unit_ticker = elapsed.as_millis() / 200;
+        if unit_ticker > last_tick {
+            last_tick = unit_ticker;
             tick = true;
             player_moved = false;
+        }
+        let fireball_ticker = elapsed.as_millis() / 100;
+        if fireball_ticker > last_fireball_tick {
+            last_fireball_tick = fireball_ticker;
+            fireball_tick = true;
+        }
+        let spawn_ticker = elapsed.as_secs() / 5;
+        if spawn_ticker > last_spawn_tick {
+            last_spawn_tick = spawn_ticker;
+            spawn_tick = true;
         }
 
         let mut actions: VecDeque<RenderAction> = VecDeque::new();
@@ -301,7 +334,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 },
                 _ => {}
             }
-            events.push((elapsed, ticker, format!("{:?} {:?}", event?, input_tracker)));
+            events.push((
+                elapsed,
+                unit_ticker,
+                format!("{:?} {:?}", event?, input_tracker),
+            ));
         }
 
         if !player_moved && input_tracker.len() > 0 {
@@ -312,6 +349,16 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             for input in &input_tracker {
                 match input.as_command() {
                     Some(Command::Move(direction)) => step += direction.as_point(),
+                    Some(Command::Fireball(direction)) => {
+                        let fireball =
+                            Fireball::new(state.player.location + direction.as_point(), direction);
+                        actions.push_back(RenderAction::Create {
+                            symbol: fireball.symbol(),
+                            color: fireball.color(),
+                            coord: fireball.coord(),
+                        });
+                        state.fireballs.push(fireball);
+                    }
                     _ => {}
                 }
             }
@@ -339,20 +386,66 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             }
         }
 
+        if fireball_tick {
+            fireball_tick = false;
+
+            let fireball_len = state.fireballs.len();
+
+            for fireball_ix in (0..fireball_len).rev() {
+                let mut fireball = state.fireballs.remove(fireball_ix);
+                let prev_coord = fireball.location.as_coord();
+                let new_pos = fireball.location + (fireball.direction.as_point() * fireball.speed);
+
+                let next_coord = new_pos.as_coord();
+                if next_coord.x > 0
+                    && next_coord.x < cols - 2
+                    && next_coord.y > 0
+                    && next_coord.y < rows - 1
+                {
+                    let mut hit = false;
+
+                    for monster_ix in 0..state.monsters.len() {
+                        if state.monsters[monster_ix].coord() == new_pos.as_coord() {
+                            state.score += 1;
+
+                            let monster = state.monsters.remove(monster_ix);
+                            actions.push_back(RenderAction::Remove(monster.coord()));
+                            actions.push_back(RenderAction::Remove(fireball.coord()));
+                            hit = true;
+                            break;
+                        }
+                    }
+
+                    if !hit {
+                        fireball.location = new_pos;
+
+                        actions.push_back(RenderAction::Move {
+                            symbol: fireball.symbol(),
+                            color: fireball.color(),
+                            old: prev_coord,
+                            new: next_coord,
+                        });
+                        state.fireballs.push(fireball);
+                    }
+                } else {
+                    actions.push_back(RenderAction::Remove(prev_coord));
+                }
+            }
+        }
+
         if tick {
             tick = false;
-            state.score -= 1;
 
             if !player_moved {
                 missed_move_ticks += 1;
-                events.push((elapsed, ticker, String::from("MissedMove")));
+                events.push((elapsed, unit_ticker, String::from("MissedMove")));
             }
 
             let monsters_len = state.monsters.len();
 
             for monster_ix in (0..monsters_len).rev() {
                 let mut monster = state.monsters.remove(monster_ix);
-                let new_pos = monster.seek(state.player.location, ticker);
+                let new_pos = monster.seek(state.player.location, unit_ticker);
 
                 let mut collision = false;
 
@@ -381,6 +474,22 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     exit = true;
                     break;
                 }
+
+                state.monsters.push(monster);
+            }
+        }
+
+        if spawn_tick {
+            spawn_tick = false;
+
+            if state.monsters.len() < 3 {
+                let monster = Unit::new(Coord::new(4, 4), None, None);
+
+                actions.push_back(RenderAction::Create {
+                    symbol: monster.symbol(),
+                    color: monster.color(),
+                    coord: monster.coord(),
+                });
 
                 state.monsters.push(monster);
             }

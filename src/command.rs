@@ -1,7 +1,8 @@
 use crate::Direction;
 
 pub enum Command {
-    Move(Direction)
+    Move(Direction),
+    Fireball(Direction),
 }
 
 pub trait AsCommand {

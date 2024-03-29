@@ -1,6 +1,7 @@
 use rand::random;
 
 use crate::magic::fireball::FireballMagic;
+use crate::magic::sphere::SphereMagic;
 use crate::{
     magic::{Magic, Spell},
     point::{AsPoint, Point},
@@ -23,8 +24,8 @@ impl Player {
             energy: 100,
             max_energy: 100,
             last_shot: 0,
-            magic: vec![Box::new(FireballMagic::new())],
-            active_spell: 0,
+            magic: vec![Box::new(FireballMagic::new()), Box::new(SphereMagic::new())],
+            active_spell: 1,
         }
     }
 

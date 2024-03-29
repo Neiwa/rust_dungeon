@@ -1,6 +1,6 @@
 use command::{AsCommand, Command};
-use console::ConsoleUnit;
 use console::{coord::AsDirection, loader};
+use console::{AsSymbol, ConsoleUnit};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -110,14 +110,14 @@ fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Resul
         } => queue!(
             stdout,
             cursor::MoveTo(old.x as u16, old.y as u16),
-            style::PrintStyledContent(" ".with(BG_COLOR).on(BG_COLOR)),
+            style::PrintStyledContent(" ".on(BG_COLOR)),
             cursor::MoveTo(new.x as u16, new.y as u16),
             style::PrintStyledContent(symbol.with(color).on(BG_COLOR)),
         )?,
         RenderAction::Remove(coord) => queue!(
             stdout,
             cursor::MoveTo(coord.x as u16, coord.y as u16),
-            style::PrintStyledContent(" ".with(BG_COLOR).on(BG_COLOR)),
+            style::PrintStyledContent(" ".on(BG_COLOR)),
         )?,
         RenderAction::Create {
             symbol,
@@ -548,14 +548,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 stdout,
                 display.status_indicators.get("energy"),
                 format!(
-                    "🧪 {:0>3}  {} 🔥 {:0>2} {}",
+                    "🧪 {:0>3}  {} {} {:0>2} {}",
                     state.player.energy,
                     loader(
                         unit_ticker,
                         state.player.last_shot + spell.cooldown(),
                         spell.cooldown()
                     ),
-                    state.player.energy / 10,
+                    spell.get_spell().as_symbol(),
+                    state.player.energy / spell.cost(),
                     loader(
                         state.player.energy as u128 % spell.cost() as u128,
                         spell.cost() as u128,

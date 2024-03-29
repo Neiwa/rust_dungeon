@@ -1,10 +1,12 @@
 use crate::{point::Point, Direction, Object};
 
 pub mod fireball;
+pub mod sphere;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Spell {
     Fireball,
+    Sphere,
 }
 
 pub trait Magic {

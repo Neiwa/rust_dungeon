@@ -4,6 +4,7 @@ use crossterm::{event::KeyCode, style::Color};
 
 use crate::{
     command::{AsCommand, Command},
+    magic::Spell,
     AsCoord, AsDirection, Coord, Direction, Object, Player, Unit,
 };
 
@@ -66,19 +67,39 @@ impl ConsoleUnit for Unit {
 
 impl ConsoleUnit for dyn Object {
     fn color(&self) -> Color {
-        match self.get_spell() {
-            crate::magic::Spell::Fireball => Color::Red,
-        }
+        self.get_spell().as_color()
     }
 
     fn symbol(&self) -> char {
-        match self.get_spell() {
-            crate::magic::Spell::Fireball => '🔥',
-        }
+        self.get_spell().as_symbol()
     }
 
     fn coord(&self) -> Coord {
         self.location().as_coord()
+    }
+}
+
+pub trait AsColor {
+    fn as_color(&self) -> Color;
+}
+pub trait AsSymbol {
+    fn as_symbol(&self) -> char;
+}
+
+impl AsSymbol for Spell {
+    fn as_symbol(&self) -> char {
+        match self {
+            Spell::Fireball => '🔥',
+            Spell::Sphere => '🔵',
+        }
+    }
+}
+impl AsColor for Spell {
+    fn as_color(&self) -> Color {
+        match self {
+            Spell::Fireball => Color::Red,
+            Spell::Sphere => Color::Blue,
+        }
     }
 }
 

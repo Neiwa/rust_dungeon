@@ -13,12 +13,12 @@ impl Point {
         Self { x, y }
     }
 
-    pub fn normalize(&self, length: f64) -> Point {
+    pub fn normalize(&self, magnitude: f64) -> Point {
         if self.x == 0.0 && self.y == 0.0 {
             return *self;
         }
         let len = (self.x.powi(2) + self.y.powi(2)).sqrt();
-        let fac = length / len;
+        let fac = magnitude / len;
         *self * fac
     }
 }

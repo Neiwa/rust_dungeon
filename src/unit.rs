@@ -19,8 +19,8 @@ impl Player {
 pub struct Unit {
     pub location: Point,
     pub last_coord: Coord,
-    pub logic: i32,
-    pub id: i32,
+    pub logic: usize,
+    pub id: usize,
     pub speed: f64,
 }
 
@@ -35,7 +35,7 @@ pub trait Monster {
 
 impl Monster for Unit {
     fn seek(&self, seek_point: Point, _elapsed: u128) -> Point {
-        let step = match rand::random::<i32>() % self.logic {
+        let step = match rand::random::<usize>() % self.logic {
             ..=39 => Point::new(
                 seek_point.x - self.location.x,
                 seek_point.y - self.location.y,
@@ -81,7 +81,7 @@ impl Unit {
         Self::new(coord, None, None)
     }
 
-    pub fn new(coord: Coord, logic: Option<i32>, speed: Option<f64>) -> Self {
+    pub fn new(coord: Coord, logic: Option<usize>, speed: Option<f64>) -> Self {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
             last_coord: coord,

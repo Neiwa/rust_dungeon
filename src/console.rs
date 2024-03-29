@@ -17,7 +17,7 @@ impl ConsoleUnit for Player {
     }
 
     fn symbol(&self) -> char {
-        '@'
+        '🧙'
     }
 
     fn coord(&self) -> Coord {
@@ -48,19 +48,21 @@ impl ConsoleUnit for Unit {
     }
 
     fn symbol(&self) -> char {
-        match self.id % 5 {
-            0 => 'W',
-            1 => 'O',
-            2 => 'X',
-            3 => 'F',
-            _ => 'C',
-        }
+        let symbols = [
+            '🦇', '🪰', '🦟', '🐢', '🐈', '🐲', '🦍', '🦬', '🦌', '🦏', '🦛', '🐂', '🐃', '🐄',
+            '🐖', '🐏', '🐑', '🐐', '🐪', '🐫', '🦙', '🦘', '🦥', '🦨', '🦡', '🐘', '🦣', '🐁',
+            '🐀', '🦔', '🐇', '🦫', '🐉', '🦎', '🐊', '🐢', '🐍', '🦕', '🦖', '🦦', '🦈', '🐬',
+            '🦭', '🐋', '🐟', '🐠', '🐡', '🦐', '🦑', '🐙', '🦞', '🦀', '🦆', '🐓', '🪼', '🦃',
+            '🦅', '🦢', '🦜', '🪿', '🦩', '🦚', '🦉', '🦤', '🐦', '🐧', '🐥', '🐤', '🦋', '🐌',
+            '🐛', '🪱', '🦗', '🐜', '🪳', '🐝', '🪲', '🐞', '🦂', '🦠', '🧞', '🧟', '🧌', '🫏',
+        ];
+        symbols[self.id % symbols.len()]
     }
 
     fn coord(&self) -> Coord {
         self.location.as_coord()
     }
-    
+
     fn last_coord(&self) -> Coord {
         self.last_coord
     }
@@ -73,7 +75,7 @@ impl AsDirection for KeyCode {
             KeyCode::Left | KeyCode::Char('a') => Some(Direction::Left),
             KeyCode::Down | KeyCode::Char('s') => Some(Direction::Down),
             KeyCode::Right | KeyCode::Char('d') => Some(Direction::Right),
-            _ => None
+            _ => None,
         }
     }
 }

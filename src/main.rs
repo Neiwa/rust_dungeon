@@ -7,6 +7,7 @@ use crossterm::{
     style::{self, Color, Stylize},
     terminal::{self, size, SetSize},
 };
+use point::Point;
 use std::{
     collections::{HashMap, VecDeque},
     fs::File,
@@ -144,6 +145,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             Unit::new(
                 Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
                 Some(40),
+                Some(0.7),
             ),
             Unit::new(
                 Coord::new(
@@ -151,10 +153,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     rows as i32 / 4 + rows as i32 / 2,
                 ),
                 Some(500),
+                None,
             ),
             Unit::new(
                 Coord::new(cols as i32 / 4, rows as i32 / 4 + rows as i32 / 2),
                 Some(200),
+                None,
             ),
         ],
     };
@@ -313,66 +317,29 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         if !player_moved && input_stack.len() > 0 {
             let prev_pos = state.player.location.as_coord();
 
-            let step = match (
-                input_stack.last(),
-                input_stack.get(input_stack.len().checked_sub(2).unwrap_or(20)),
-            ) {
-                (Some(Direction::Up), Some(Direction::Left))
-                | (Some(Direction::Left), Some(Direction::Up))
-                    if prev_pos.x - 1 > 0 && prev_pos.y - 1 > 0 =>
-                {
-                    Some((Direction::Left.as_point() + Direction::Up.as_point()).normalize_max(1.0))
-                }
-                (Some(Direction::Left), Some(Direction::Down))
-                | (Some(Direction::Down), Some(Direction::Left))
-                    if prev_pos.x - 1 > 0 && prev_pos.y + 2 < rows as i32 =>
-                {
-                    Some(
-                        (Direction::Left.as_point() + Direction::Down.as_point())
-                            .normalize_max(1.0),
-                    )
-                }
-                (Some(Direction::Up), Some(Direction::Right))
-                | (Some(Direction::Right), Some(Direction::Up))
-                    if prev_pos.x + 2 < cols as i32 && prev_pos.y - 1 > 0 =>
-                {
-                    Some(
-                        (Direction::Right.as_point() + Direction::Up.as_point()).normalize_max(1.0),
-                    )
-                }
-                (Some(Direction::Right), Some(Direction::Down))
-                | (Some(Direction::Down), Some(Direction::Right))
-                    if prev_pos.x + 2 < cols as i32 && prev_pos.y + 2 < rows as i32 =>
-                {
-                    Some(
-                        (Direction::Right.as_point() + Direction::Down.as_point())
-                            .normalize_max(1.0),
-                    )
-                }
-                (Some(Direction::Left), _) if prev_pos.x - 1 > 0 => {
-                    Some(Direction::Left.as_point())
-                }
-                (Some(Direction::Right), _) if prev_pos.x + 2 < cols as i32 => {
-                    Some(Direction::Right.as_point())
-                }
-                (Some(Direction::Up), _) if prev_pos.y - 1 > 0 => Some(Direction::Up.as_point()),
-                (Some(Direction::Down), _) if prev_pos.y + 2 < rows as i32 => {
-                    Some(Direction::Down.as_point())
-                }
-                _ => None,
-            };
+            let mut step = input_stack.last().unwrap().as_point();
 
-            if step.is_some() {
-                state.player.step(state.player.location + step.unwrap());
+            if let Some(secondary_direction) = input_stack.get(input_stack.len().wrapping_sub(2)) {
+                step += secondary_direction.as_point();
             }
 
-            actions.push_back(Action::Move {
-                symbol: state.player.symbol(),
-                color: state.player.color(),
-                old: prev_pos,
-                new: state.player.coord(),
-            });
-            player_moved = true;
+            let next_pos = state.player.location + step.normalize(state.player.speed());
+            let next_coord = next_pos.as_coord();
+            if next_coord.x > 0
+                && next_coord.x < cols - 1
+                && next_coord.y > 0
+                && next_coord.y < rows - 1
+            {
+                state.player.step(next_pos);
+
+                actions.push_back(Action::Move {
+                    symbol: state.player.symbol(),
+                    color: state.player.color(),
+                    old: prev_pos,
+                    new: state.player.coord(),
+                });
+                player_moved = true;
+            }
         }
 
         if tick {

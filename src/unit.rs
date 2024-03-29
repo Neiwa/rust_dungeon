@@ -19,12 +19,14 @@ impl Player {
 pub struct Unit {
     pub location: Point,
     pub last_coord: Coord,
-    pub speed: i32,
+    pub logic: i32,
     pub id: i32,
+    pub speed: f64,
 }
 
 pub trait UnitLogic {
     fn step(&mut self, step: Point);
+    fn speed(&self) -> f64;
 }
 
 pub trait Monster {
@@ -33,7 +35,7 @@ pub trait Monster {
 
 impl Monster for Unit {
     fn seek(&self, seek_point: Point, _elapsed: u128) -> Point {
-        let step = match rand::random::<i32>() % self.speed {
+        let step = match rand::random::<i32>() % self.logic {
             ..=39 => Point::new(
                 seek_point.x - self.location.x,
                 seek_point.y - self.location.y,
@@ -46,7 +48,7 @@ impl Monster for Unit {
             ..=99 => Direction::Down.as_point(),
             _ => Point::new(0.0, 0.0),
         }
-        .normalize_max(1.0);
+        .normalize(self.speed);
 
         self.location + step
     }
@@ -57,6 +59,10 @@ impl UnitLogic for Unit {
         self.last_coord = self.location.as_coord();
         self.location = step;
     }
+    
+    fn speed(&self) -> f64 {
+        self.speed
+    }
 }
 
 impl UnitLogic for Player {
@@ -64,18 +70,23 @@ impl UnitLogic for Player {
         self.last_coord = self.location.as_coord();
         self.location = step;
     }
+    
+    fn speed(&self) -> f64 {
+        1.0
+    }
 }
 
 impl Unit {
     pub fn new_simple(coord: Coord) -> Self {
-        Self::new(coord, None)
+        Self::new(coord, None, None)
     }
 
-    pub fn new(coord: Coord, speed: Option<i32>) -> Self {
+    pub fn new(coord: Coord, logic: Option<i32>, speed: Option<f64>) -> Self {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
             last_coord: coord,
-            speed: speed.unwrap_or(100),
+            logic: logic.unwrap_or(100),
+            speed: speed.unwrap_or(0.8),
             id: random(),
         }
     }

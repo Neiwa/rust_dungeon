@@ -1,4 +1,4 @@
-use action::Action;
+use command::{AsCommand, Command};
 use console::coord::AsDirection;
 use console::ConsoleUnit;
 use crossterm::{
@@ -8,7 +8,8 @@ use crossterm::{
     style::{self, Color, Stylize},
     terminal::{self, size, SetSize},
 };
-use point::AsPoint;
+use point::{AsPoint, Point};
+use render_action::RenderAction;
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -17,9 +18,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-mod action;
+mod command;
 mod console;
 pub mod point;
+mod render_action;
 mod unit;
 use crate::console::coord::*;
 use crate::unit::*;
@@ -107,9 +109,9 @@ fn queue_unit_draw(stdout: &mut io::Stdout, unit: &dyn ConsoleUnit) -> io::Resul
     Ok(())
 }
 
-fn queue_action_draw(stdout: &mut io::Stdout, action: Action) -> io::Result<()> {
+fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Result<()> {
     match action {
-        Action::Move {
+        RenderAction::Move {
             symbol,
             color,
             old,
@@ -268,14 +270,14 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             player_moved = false;
         }
 
-        let mut actions: VecDeque<Action> = VecDeque::new();
+        let mut actions: VecDeque<RenderAction> = VecDeque::new();
 
         if poll(Duration::from_millis(20))? {
             let event = read();
             match event {
                 Ok(Event::Key(KeyEvent { code, kind, .. })) => match kind {
                     event::KeyEventKind::Press => {
-                        if code.as_direction().is_some() {
+                        if code.as_command().is_some() {
                             if !input_tracker.contains(&code) {
                                 input_tracker.push_front(code);
                             }
@@ -289,7 +291,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         }
                     }
                     event::KeyEventKind::Release => {
-                        if code.as_direction().is_some() {
+                        if code.as_command().is_some() {
                             if input_tracker.contains(&code) {
                                 input_tracker.retain(|&d| d != code);
                             }
@@ -305,36 +307,35 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         if !player_moved && input_tracker.len() > 0 {
             let prev_pos = state.player.location.as_coord();
 
-            let mut step = input_tracker
-                .get(0)
-                .unwrap()
-                .as_direction()
-                .unwrap()
-                .as_point();
+            let mut step = Point::new(0.0, 0.0);
 
-            if let Some(secondary_input) = input_tracker.get(1) {
-                if let Some(direction) = secondary_input.as_direction() {
-                    step += direction.as_point();
+            for input in &input_tracker {
+                match input.as_command() {
+                    Some(Command::Move(direction)) => step += direction.as_point(),
+                    _ => {}
                 }
             }
 
-            let next_pos = state.player.location + step.normalize(state.player.speed());
-            let next_coord = next_pos.as_coord();
+            // Move
+            if step != Point::new(0.0, 0.0) {
+                let next_pos = state.player.location + step.normalize(state.player.speed());
+                let next_coord = next_pos.as_coord();
 
-            if next_coord.x > 0
-                && next_coord.x < cols - 1
-                && next_coord.y > 0
-                && next_coord.y < rows - 1
-            {
-                state.player.step(next_pos);
+                if next_coord.x > 0
+                    && next_coord.x < cols - 1
+                    && next_coord.y > 0
+                    && next_coord.y < rows - 1
+                {
+                    state.player.step(next_pos);
 
-                actions.push_back(Action::Move {
-                    symbol: state.player.symbol(),
-                    color: state.player.color(),
-                    old: prev_pos,
-                    new: state.player.coord(),
-                });
-                player_moved = true;
+                    actions.push_back(RenderAction::Move {
+                        symbol: state.player.symbol(),
+                        color: state.player.color(),
+                        old: prev_pos,
+                        new: state.player.coord(),
+                    });
+                    player_moved = true;
+                }
             }
         }
 
@@ -367,7 +368,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     let prev_pos = monster.coord();
                     monster.step(new_pos);
 
-                    actions.push_back(Action::Move {
+                    actions.push_back(RenderAction::Move {
                         symbol: monster.symbol(),
                         color: monster.color(),
                         old: prev_pos,

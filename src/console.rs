@@ -2,7 +2,7 @@ pub mod coord;
 
 use crossterm::{event::KeyCode, style::Color};
 
-use crate::{AsCoord, AsDirection, Coord, Direction, Player, Unit};
+use crate::{command::{AsCommand, Command}, AsCoord, AsDirection, Coord, Direction, Player, Unit};
 
 pub trait ConsoleUnit {
     fn color(&self) -> Color;
@@ -75,6 +75,18 @@ impl AsDirection for KeyCode {
             KeyCode::Left | KeyCode::Char('a') => Some(Direction::Left),
             KeyCode::Down | KeyCode::Char('s') => Some(Direction::Down),
             KeyCode::Right | KeyCode::Char('d') => Some(Direction::Right),
+            _ => None,
+        }
+    }
+}
+
+impl AsCommand for KeyCode {
+    fn as_command(&self) -> Option<Command> {
+        match self {
+            KeyCode::Up | KeyCode::Char('w') => Some(Command::Move(Direction::Up)),
+            KeyCode::Left | KeyCode::Char('a') => Some(Command::Move(Direction::Left)),
+            KeyCode::Down | KeyCode::Char('s') => Some(Command::Move(Direction::Down)),
+            KeyCode::Right | KeyCode::Char('d') => Some(Command::Move(Direction::Right)),
             _ => None,
         }
     }

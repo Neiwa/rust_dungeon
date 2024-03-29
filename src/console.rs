@@ -91,6 +91,7 @@ impl AsSymbol for Spell {
         match self {
             Spell::Fireball => '🔥',
             Spell::Sphere => '🔵',
+            Spell::Inferno => '🎆',
         }
     }
 }
@@ -99,6 +100,7 @@ impl AsColor for Spell {
         match self {
             Spell::Fireball => Color::Red,
             Spell::Sphere => Color::Blue,
+            Spell::Inferno => Color::Red,
         }
     }
 }

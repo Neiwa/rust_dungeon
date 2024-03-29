@@ -7,15 +7,15 @@ use crate::{
 #[derive(Debug)]
 pub struct FireballObject {
     pub location: Point,
-    pub direction: Direction,
+    pub vector: Point,
     pub speed: f64,
 }
 
 impl FireballObject {
-    pub fn new(location: Point, direction: Direction) -> FireballObject {
-        FireballObject {
+    pub fn new(location: Point, vector: Point) -> Self {
+        Self {
             location,
-            direction,
+            vector: vector.normalize(0.8),
             speed: 0.8,
         }
     }
@@ -26,8 +26,8 @@ impl Object for FireballObject {
         self.location
     }
 
-    fn direction(&self) -> Direction {
-        self.direction
+    fn vector(&self) -> Point {
+        self.vector
     }
 
     fn speed(&self) -> f64 {
@@ -44,11 +44,13 @@ impl Object for FireballObject {
 }
 
 #[derive(Debug)]
-pub struct FireballMagic;
+pub struct FireballMagic {
+    last_evoke: Option<u128>,
+}
 
 impl FireballMagic {
     pub fn new() -> Self {
-        Self {}
+        Self { last_evoke: None }
     }
 }
 
@@ -61,20 +63,38 @@ impl Magic for FireballMagic {
         4
     }
 
-    fn evoke(&self, location: Point, direction: Direction) -> Box<dyn Object> {
-        match direction {
+    fn evoke(
+        &mut self,
+        location: Point,
+        direction: Direction,
+        ticker: u128,
+    ) -> Vec<Box<dyn Object>> {
+        self.last_evoke = Some(ticker);
+
+        vec![match direction {
             Direction::Up | Direction::Down => Box::new(FireballObject::new(
                 location + direction.as_point(),
-                direction,
+                direction.as_point(),
             )),
             Direction::Left | Direction::Right => Box::new(FireballObject::new(
                 location + direction.as_point() * 2,
-                direction,
+                direction.as_point(),
             )),
-        }
+        }]
     }
 
     fn get_spell(&self) -> Spell {
         Spell::Fireball
+    }
+
+    fn on_cooldown(&self, ticker: u128) -> bool {
+        self.remaining_cooldown(ticker) > 0
+    }
+
+    fn remaining_cooldown(&self, ticker: u128) -> u128 {
+        if let Some(last_evoke) = self.last_evoke {
+            return (last_evoke + self.cooldown()).saturating_sub(ticker);
+        }
+        0
     }
 }

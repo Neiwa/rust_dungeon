@@ -7,7 +7,7 @@ use crate::{
 #[derive(Debug)]
 pub struct SphereObject {
     pub location: Point,
-    pub direction: Direction,
+    pub vector: Point,
     pub speed: f64,
 }
 
@@ -15,7 +15,7 @@ impl SphereObject {
     pub fn new(location: Point, direction: Direction) -> Self {
         Self {
             location,
-            direction,
+            vector: direction.as_point().normalize(0.5),
             speed: 0.5,
         }
     }
@@ -26,8 +26,8 @@ impl Object for SphereObject {
         self.location
     }
 
-    fn direction(&self) -> Direction {
-        self.direction
+    fn vector(&self) -> Point {
+        self.vector
     }
 
     fn speed(&self) -> f64 {
@@ -44,11 +44,13 @@ impl Object for SphereObject {
 }
 
 #[derive(Debug)]
-pub struct SphereMagic;
+pub struct SphereMagic {
+    last_evoke: Option<u128>,
+}
 
 impl SphereMagic {
     pub fn new() -> Self {
-        Self {}
+        Self { last_evoke: None }
     }
 }
 
@@ -61,8 +63,15 @@ impl Magic for SphereMagic {
         2
     }
 
-    fn evoke(&self, location: Point, direction: Direction) -> Box<dyn Object> {
-        match direction {
+    fn evoke(
+        &mut self,
+        location: Point,
+        direction: Direction,
+        ticker: u128,
+    ) -> Vec<Box<dyn Object>> {
+        self.last_evoke = Some(ticker);
+
+        vec![match direction {
             Direction::Up | Direction::Down => Box::new(SphereObject::new(
                 location + direction.as_point(),
                 direction,
@@ -71,10 +80,21 @@ impl Magic for SphereMagic {
                 location + direction.as_point() * 2,
                 direction,
             )),
-        }
+        }]
     }
 
     fn get_spell(&self) -> Spell {
         Spell::Sphere
+    }
+
+    fn on_cooldown(&self, ticker: u128) -> bool {
+        self.remaining_cooldown(ticker) > 0
+    }
+
+    fn remaining_cooldown(&self, ticker: u128) -> u128 {
+        if let Some(last_evoke) = self.last_evoke {
+            return (last_evoke + self.cooldown()).saturating_sub(ticker);
+        }
+        0
     }
 }

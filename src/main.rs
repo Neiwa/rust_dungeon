@@ -10,7 +10,6 @@ use crossterm::{
 };
 
 use point::{AsPoint, Point};
-use rand::{thread_rng, Rng};
 use render_action::RenderAction;
 
 use std::collections::HashSet;
@@ -20,6 +19,8 @@ use std::{
     io::{self, Write},
     time::{Duration, Instant},
 };
+
+use unicode_width::UnicodeWidthChar;
 
 mod command;
 mod console;
@@ -48,13 +49,8 @@ struct Indicator {
     bg_color: Color,
 }
 
-const BG_COLOR: Color = Color::Rgb { r: 4, g: 109, b: 0 };
-
 fn bg_color(_coord: Coord) -> Color {
-    // let r = thread_rng().gen_range(2..=6);
-    // let g = thread_rng().gen_range(100..=115);
-    // let b = 0;
-    let r = (2 + (_coord.x * _coord.y ^ 348798) % 4) as u8;
+    let r = (2 + (_coord.x * _coord.y ^ 34348798) % 5) as u8;
     let g = (100 + (_coord.x * _coord.y ^ 2344839) % 15) as u8;
     let b = 0;
     Color::Rgb { r, g, b }
@@ -125,20 +121,21 @@ fn queue_actions_draw(
             RenderAction::Move {
                 old, new, symbol, ..
             } => {
-                for i in 0..symbol.len_utf8() {
+                let width = UnicodeWidthChar::width(*symbol).unwrap_or(0);
+                for i in 0..width {
                     clear.insert(*old + Coord::new(1, 0) * i);
                 }
-                for i in 0..symbol.len_utf8() {
+                for i in 0..width {
                     skip_clear.insert(*new + Coord::new(1, 0) * i);
                 }
             }
             RenderAction::Remove { coord, symbol } => {
-                for i in 0..symbol.len_utf8() {
+                for i in 0..UnicodeWidthChar::width(*symbol).unwrap_or(0) {
                     clear.insert(*coord + Coord::new(1, 0) * i);
                 }
             }
             RenderAction::Create { coord, symbol, .. } => {
-                for i in 0..symbol.len_utf8() {
+                for i in 0..UnicodeWidthChar::width(*symbol).unwrap_or(0) {
                     skip_clear.insert(*coord + Coord::new(1, 0) * i);
                 }
             }
@@ -150,7 +147,7 @@ fn queue_actions_draw(
             queue!(
                 stdout,
                 cursor::MoveTo(coord.x as u16, coord.y as u16),
-                style::PrintStyledContent(" ".on(bg_color(coord))),
+                style::PrintStyledContent(' '.on(bg_color(coord))),
             )?;
         }
     }
@@ -421,33 +418,24 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 match input.as_command() {
                     Some(Command::Move(direction)) => step += direction.as_point(),
                     Some(Command::Evoke(direction)) => {
-                        let mut cast_spell = false;
-                        let magic = state.player.get_active_spell();
+                        if state.player.active_spell_can_evoke(unit_ticker) {
+                            let mut objects =
+                                state.player.active_spell_evoke(direction, unit_ticker);
 
-                        if unit_ticker.saturating_sub(magic.cooldown()) >= state.player.last_shot
-                            && state.player.energy >= magic.cost()
-                        {
-                            let object = magic.evoke(state.player.location, direction);
+                            while let Some(object) = objects.pop() {
+                                render_actions.push_back(RenderAction::Create {
+                                    symbol: object.symbol(),
+                                    color: object.color(),
+                                    coord: object.location().as_coord(),
+                                });
 
-                            render_actions.push_back(RenderAction::Create {
-                                symbol: object.symbol(),
-                                color: object.color(),
-                                coord: object.location().as_coord(),
-                            });
-
-                            state.objects.push(object);
-
-                            state.player.energy -= magic.cost();
-                            cast_spell = true;
-                        }
-
-                        if cast_spell {
-                            state.player.last_shot = unit_ticker;
+                                state.objects.push(object);
+                            }
                         }
                     }
                     Some(Command::CycleSpell) => {
                         state.player.active_spell =
-                            (state.player.active_spell + 1) % state.player.magic.len()
+                            (state.player.active_spell + 1) % state.player.spells.len()
                     }
                     _ => {}
                 }
@@ -483,7 +471,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             for object_ix in (0..object_len).rev() {
                 let mut object = state.objects.remove(object_ix);
                 let prev_coord = object.location().as_coord();
-                let new_pos = object.location() + (object.direction().as_point() * object.speed());
+                let new_pos = object.location() + object.vector();
 
                 let next_coord = new_pos.as_coord();
                 if next_coord.x > 0
@@ -628,8 +616,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     "🧪 {:0>3}  {} {} {:0>2} {}",
                     state.player.energy,
                     loader(
-                        unit_ticker,
-                        state.player.last_shot + spell.cooldown(),
+                        spell.cooldown() - spell.remaining_cooldown(unit_ticker),
+                        spell.cooldown(),
                         spell.cooldown()
                     ),
                     spell.get_spell().as_symbol(),

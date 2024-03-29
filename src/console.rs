@@ -1,8 +1,8 @@
 pub mod coord;
 
-use crossterm::style::Color;
+use crossterm::{event::KeyCode, style::Color};
 
-use crate::{Coord, Player, Unit};
+use crate::{Coord, Direction, Player, Unit};
 
 pub trait ConsoleUnit {
     fn color(&self) -> Color;
@@ -63,5 +63,21 @@ impl ConsoleUnit for Unit {
     
     fn last_coord(&self) -> Coord {
         self.last_coord
+    }
+}
+
+pub trait AsDirection {
+    fn as_direction(self) -> Option<Direction>;
+}
+
+impl AsDirection for KeyCode {
+    fn as_direction(self) -> Option<Direction> {
+        match self {
+            KeyCode::Up | KeyCode::Char('w') => Some(Direction::Up),
+            KeyCode::Left | KeyCode::Char('a') => Some(Direction::Left),
+            KeyCode::Down | KeyCode::Char('s') => Some(Direction::Down),
+            KeyCode::Right | KeyCode::Char('d') => Some(Direction::Right),
+            _ => None
+        }
     }
 }

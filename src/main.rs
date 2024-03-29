@@ -1,5 +1,5 @@
 use action::Action;
-use console::ConsoleUnit;
+use console::{AsDirection, ConsoleUnit};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -238,7 +238,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut tick = false;
     let mut exit = false;
     let mut player_moved = false;
-    let mut input_stack: Vec<Direction> = Vec::new();
+    let mut input_tracker: VecDeque<KeyCode> = VecDeque::new();
     let mut missed_move_ticks = 0;
 
     let mut events = Vec::new();
@@ -258,69 +258,41 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             let event = read();
             match event {
                 Ok(Event::Key(KeyEvent { code, kind, .. })) => match kind {
-                    event::KeyEventKind::Press => match code {
-                        KeyCode::Left => {
-                            if !input_stack.contains(&Direction::Left) {
-                                input_stack.push(Direction::Left);
+                    event::KeyEventKind::Press => {
+                        if code.as_direction().is_some() {
+                            if !input_tracker.contains(&code) {
+                                input_tracker.push_front(code);
+                            }
+                        } else {
+                            match code {
+                                KeyCode::Esc => {
+                                    break;
+                                }
+                                _ => {}
                             }
                         }
-                        KeyCode::Right => {
-                            if !input_stack.contains(&Direction::Right) {
-                                input_stack.push(Direction::Right);
+                    }
+                    event::KeyEventKind::Release => {
+                        if code.as_direction().is_some() {
+                            if input_tracker.contains(&code) {
+                                input_tracker.retain(|&d| d != code);
                             }
                         }
-                        KeyCode::Up => {
-                            if !input_stack.contains(&Direction::Up) {
-                                input_stack.push(Direction::Up);
-                            }
-                        }
-                        KeyCode::Down => {
-                            if !input_stack.contains(&Direction::Down) {
-                                input_stack.push(Direction::Down);
-                            }
-                        }
-                        KeyCode::Esc => {
-                            break;
-                        }
-                        _ => {}
-                    },
-                    event::KeyEventKind::Release => match code {
-                        KeyCode::Left => {
-                            if input_stack.contains(&Direction::Left) {
-                                input_stack.retain(|&d| d != Direction::Left);
-                            }
-                        }
-                        KeyCode::Right => {
-                            if input_stack.contains(&Direction::Right) {
-                                input_stack.retain(|&d| d != Direction::Right);
-                            }
-                        }
-                        KeyCode::Up => {
-                            if input_stack.contains(&Direction::Up) {
-                                input_stack.retain(|&d| d != Direction::Up);
-                            }
-                        }
-                        KeyCode::Down => {
-                            if input_stack.contains(&Direction::Down) {
-                                input_stack.retain(|&d| d != Direction::Down);
-                            }
-                        }
-                        _ => {}
-                    },
+                    }
                     event::KeyEventKind::Repeat => {}
                 },
                 _ => {}
             }
-            events.push((elapsed, ticker, format!("{:?} {:?}", event?, input_stack)));
+            events.push((elapsed, ticker, format!("{:?} {:?}", event?, input_tracker)));
         }
 
-        if !player_moved && input_stack.len() > 0 {
+        if !player_moved && input_tracker.len() > 0 {
             let prev_pos = state.player.location.as_coord();
 
-            let mut step = input_stack.last().unwrap().as_point();
+            let mut step = input_tracker.get(0).unwrap().as_direction().unwrap().as_point();
 
-            if let Some(secondary_direction) = input_stack.get(input_stack.len().wrapping_sub(2)) {
-                step += secondary_direction.as_point();
+            if let Some(secondary_input) = input_tracker.get(1) {
+                step += secondary_input.as_direction().unwrap().as_point();
             }
 
             let next_pos = state.player.location + step.normalize(state.player.speed());

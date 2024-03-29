@@ -22,7 +22,6 @@ use std::{
 
 mod command;
 mod console;
-mod fireball;
 mod magic;
 pub mod point;
 mod render_action;

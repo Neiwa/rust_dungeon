@@ -1,7 +1,8 @@
 use rand::random;
 
+use crate::magic::fireball::FireballMagic;
 use crate::{
-    magic::{FireballMagic, Magic, Spell},
+    magic::{Magic, Spell},
     point::{AsPoint, Point},
     Coord, Direction,
 };

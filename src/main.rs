@@ -1,6 +1,6 @@
 use command::{AsCommand, Command};
-use console::coord::AsDirection;
 use console::ConsoleUnit;
+use console::{coord::AsDirection, loader};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -304,7 +304,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             spawn_tick = true;
         }
 
-        let mut actions: VecDeque<RenderAction> = VecDeque::new();
+        let mut render_actions: VecDeque<RenderAction> = VecDeque::new();
 
         if poll(Duration::from_millis(20))? {
             let event = read();
@@ -351,14 +351,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 match input.as_command() {
                     Some(Command::Move(direction)) => step += direction.as_point(),
                     Some(Command::Fireball(direction)) => {
-                        if unit_ticker.saturating_sub(4) >= state.player.last_shot
-                            && state.player.energy >= 10
+                        if unit_ticker.saturating_sub(state.player.fireball_cooldown)
+                            >= state.player.last_shot
+                            && state.player.energy >= state.player.fireball_cost
                         {
                             let fireball = Fireball::new(
                                 state.player.location + direction.as_point(),
                                 direction,
                             );
-                            actions.push_back(RenderAction::Create {
+                            render_actions.push_back(RenderAction::Create {
                                 symbol: fireball.symbol(),
                                 color: fireball.color(),
                                 coord: fireball.coord(),
@@ -366,7 +367,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                             state.fireballs.push(fireball);
 
                             state.player.last_shot = unit_ticker;
-                            state.player.energy -= 10;
+                            state.player.energy -= state.player.fireball_cost;
                         }
                     }
                     _ => {}
@@ -385,7 +386,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 {
                     state.player.step(next_pos);
 
-                    actions.push_back(RenderAction::Move {
+                    render_actions.push_back(RenderAction::Move {
                         symbol: state.player.symbol(),
                         color: state.player.color(),
                         old: prev_pos,
@@ -419,8 +420,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                             state.score += 1;
 
                             let monster = state.monsters.remove(monster_ix);
-                            actions.push_back(RenderAction::Remove(monster.coord()));
-                            actions.push_back(RenderAction::Remove(fireball.coord()));
+                            render_actions.push_back(RenderAction::Remove(monster.coord()));
+                            render_actions.push_back(RenderAction::Remove(fireball.coord()));
                             hit = true;
                             break;
                         }
@@ -429,7 +430,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     if !hit {
                         fireball.location = new_pos;
 
-                        actions.push_back(RenderAction::Move {
+                        render_actions.push_back(RenderAction::Move {
                             symbol: fireball.symbol(),
                             color: fireball.color(),
                             old: prev_coord,
@@ -438,7 +439,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         state.fireballs.push(fireball);
                     }
                 } else {
-                    actions.push_back(RenderAction::Remove(prev_coord));
+                    render_actions.push_back(RenderAction::Remove(prev_coord));
                 }
             }
         }
@@ -447,7 +448,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             tick = false;
 
             if !player_moved {
-                state.player.energy += 1;
+                if state.player.energy < state.player.max_energy {
+                    state.player.energy += 1;
+                }
                 events.push((elapsed, unit_ticker, String::from("MissedMove")));
             }
 
@@ -477,7 +480,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         let prev_pos = monster.coord();
                         monster.step(new_pos);
 
-                        actions.push_back(RenderAction::Move {
+                        render_actions.push_back(RenderAction::Move {
                             symbol: monster.symbol(),
                             color: monster.color(),
                             old: prev_pos,
@@ -502,7 +505,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             if state.monsters.len() < 3 {
                 let monster = Unit::new(Coord::new(4, 4), None, None);
 
-                actions.push_back(RenderAction::Create {
+                render_actions.push_back(RenderAction::Create {
                     symbol: monster.symbol(),
                     color: monster.color(),
                     coord: monster.coord(),
@@ -512,8 +515,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             }
         }
 
-        if actions.len() > 0 {
-            while let Some(action) = actions.pop_front() {
+        if render_actions.len() > 0 {
+            while let Some(action) = render_actions.pop_front() {
                 queue_action_draw(stdout, action)?;
             }
 
@@ -540,9 +543,17 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 display.status_indicators.get("energy"),
                 format!(
                     "{} 🔥 {:0>2} {}",
-                    loader(unit_ticker, state.player.last_shot + 4, 4),
+                    loader(
+                        unit_ticker,
+                        state.player.last_shot + state.player.fireball_cooldown,
+                        state.player.fireball_cooldown
+                    ),
                     state.player.energy / 10,
-                    loader(state.player.energy as u128 % 10, 10, 10)
+                    loader(
+                        state.player.energy as u128 % state.player.fireball_cost as u128,
+                        state.player.fireball_cost as u128,
+                        state.player.fireball_cost as u128
+                    )
                 ),
             )?;
 
@@ -565,13 +576,4 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     }
 
     Ok(state.score)
-}
-
-const LOADING_SYMBOLS: [char; 9] = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-
-fn loader(current: u128, target: u128, range: u128) -> char {
-    let val = ((range.saturating_sub(target.saturating_sub(current))) as f32 / range as f32
-        * LOADING_SYMBOLS.len() as f32)
-        .clamp(0.0, (LOADING_SYMBOLS.len() - 1) as f32) as usize;
-    LOADING_SYMBOLS[val]
 }

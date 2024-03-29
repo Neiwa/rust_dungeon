@@ -1,11 +1,17 @@
 use rand::random;
 
-use crate::{point::{AsPoint, Point}, Coord, Direction};
+use crate::{
+    point::{AsPoint, Point},
+    Coord, Direction,
+};
 
 pub struct Player {
     pub location: Point,
     pub energy: u32,
+    pub max_energy: u32,
     pub last_shot: u128,
+    pub fireball_cooldown: u128,
+    pub fireball_cost: u32,
 }
 
 impl Player {
@@ -13,7 +19,10 @@ impl Player {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
             energy: 100,
+            max_energy: 100,
             last_shot: 0,
+            fireball_cooldown: 4,
+            fireball_cost: 10,
         }
     }
 }
@@ -59,7 +68,7 @@ impl UnitLogic for Unit {
     fn step(&mut self, step: Point) {
         self.location = step;
     }
-    
+
     fn speed(&self) -> f64 {
         self.speed
     }
@@ -69,7 +78,7 @@ impl UnitLogic for Player {
     fn step(&mut self, step: Point) {
         self.location = step;
     }
-    
+
     fn speed(&self) -> f64 {
         1.0
     }

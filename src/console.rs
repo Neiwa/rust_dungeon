@@ -104,3 +104,13 @@ impl AsCommand for KeyCode {
         }
     }
 }
+
+const LOADING_SYMBOLS: [char; 9] = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+pub fn loader(current: u128, target: u128, range: u128) -> char {
+    let val = ((range.saturating_sub(target.saturating_sub(current))) as f32 / range as f32
+        * LOADING_SYMBOLS.len() as f32)
+        .clamp(0.0, (LOADING_SYMBOLS.len() - 1) as f32) as usize;
+    LOADING_SYMBOLS[val]
+}
+

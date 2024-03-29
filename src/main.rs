@@ -233,32 +233,24 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     for y in 0..rows {
         for x in 0..cols {
-            let draw = match (x, y) {
-                (1, 1) => Some('▥'.with(Color::White).on(bg_color(Coord::new(x, y)))),
-                (0, 0) => Some('╔'.magenta()),
-                (0, y) if y == rows - 1 => Some('╚'.magenta()),
-                (x, 0) if x == cols - 1 => Some('╗'.magenta()),
-                (x, y) if x == cols - 1 && y == rows - 1 => Some('╝'.magenta()),
-                (0, _) => Some('║'.magenta()),
-                (x, _) if x == cols - 1 => Some('║'.magenta()),
-                (_, 0) => Some('═'.magenta()),
-                (_, y) if y == rows - 1 => Some('═'.magenta()),
-                _ => None,
+            let content = match (x, y) {
+                (1, 1) => '▥'.with(Color::White).on(bg_color(Coord::new(x, y))),
+                (0, 0) => '╔'.magenta(),
+                (0, y) if y == rows - 1 => '╚'.magenta(),
+                (x, 0) if x == cols - 1 => '╗'.magenta(),
+                (x, y) if x == cols - 1 && y == rows - 1 => '╝'.magenta(),
+                (0, _) => '║'.magenta(),
+                (x, _) if x == cols - 1 => '║'.magenta(),
+                (_, 0) => '═'.magenta(),
+                (_, y) if y == rows - 1 => '═'.magenta(),
+                _ => ' '.on(bg_color(Coord::new(x, y))),
             };
 
-            if let Some(content) = draw {
-                queue!(
-                    stdout,
-                    cursor::MoveTo(x as u16, y as u16),
-                    style::PrintStyledContent(content)
-                )?;
-            } else {
-                queue!(
-                    stdout,
-                    cursor::MoveTo(x as u16, y as u16),
-                    style::PrintStyledContent(" ".on(bg_color(Coord::new(x, y))))
-                )?;
-            }
+            queue!(
+                stdout,
+                cursor::MoveTo(x as u16, y as u16),
+                style::PrintStyledContent(content)
+            )?;
         }
     }
     queue_value_draw(

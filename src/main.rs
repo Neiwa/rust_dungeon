@@ -9,7 +9,6 @@ use crossterm::{
     terminal::{self, size, SetSize},
 };
 
-use magic::Spell;
 use point::{AsPoint, Point};
 use render_action::RenderAction;
 
@@ -211,7 +210,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             (
                 "energy",
                 Indicator {
-                    coord: Coord::new(cols as i32 - 12, rows as i32 - 1),
+                    coord: Coord::new(cols as i32 - 20, rows as i32 - 1),
                     color: Color::White,
                     bg_color: Color::Magenta,
                 },
@@ -350,30 +349,28 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 match input.as_command() {
                     Some(Command::Move(direction)) => step += direction.as_point(),
                     Some(Command::Fireball(direction)) => {
-                        let magic = state
-                            .player
-                            .magic
-                            .iter()
-                            .find(|m| m.get_spell() == Spell::Fireball);
+                        let mut cast_spell = false;
+                        let magic = state.player.get_active_spell();
 
-                        if let Some(fireball_magic) = magic {
-                            if unit_ticker.saturating_sub(fireball_magic.cooldown())
-                                >= state.player.last_shot
-                                && state.player.energy >= fireball_magic.cost()
-                            {
-                                let object = fireball_magic.evoke(state.player.location, direction);
+                        if unit_ticker.saturating_sub(magic.cooldown()) >= state.player.last_shot
+                            && state.player.energy >= magic.cost()
+                        {
+                            let object = magic.evoke(state.player.location, direction);
 
-                                render_actions.push_back(RenderAction::Create {
-                                    symbol: object.symbol(),
-                                    color: object.color(),
-                                    coord: object.location().as_coord(),
-                                });
+                            render_actions.push_back(RenderAction::Create {
+                                symbol: object.symbol(),
+                                color: object.color(),
+                                coord: object.location().as_coord(),
+                            });
 
-                                state.objects.push(object);
+                            state.objects.push(object);
 
-                                state.player.last_shot = unit_ticker;
-                                state.player.energy -= fireball_magic.cost();
-                            }
+                            state.player.energy -= magic.cost();
+                            cast_spell = true;
+                        }
+
+                        if cast_spell {
+                            state.player.last_shot = unit_ticker;
                         }
                     }
                     _ => {}
@@ -545,21 +542,24 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 format!("{:>3}", state.score),
             )?;
 
+            let spell = state.player.get_active_spell();
+
             queue_value_draw(
                 stdout,
                 display.status_indicators.get("energy"),
                 format!(
-                    "{} 🔥 {:0>2} {}",
+                    "🧪 {:0>3}  {} 🔥 {:0>2} {}",
+                    state.player.energy,
                     loader(
                         unit_ticker,
-                        state.player.last_shot + state.player.fireball_cooldown,
-                        state.player.fireball_cooldown
+                        state.player.last_shot + spell.cooldown(),
+                        spell.cooldown()
                     ),
                     state.player.energy / 10,
                     loader(
-                        state.player.energy as u128 % state.player.fireball_cost as u128,
-                        state.player.fireball_cost as u128,
-                        state.player.fireball_cost as u128
+                        state.player.energy as u128 % spell.cost() as u128,
+                        spell.cost() as u128,
+                        spell.cost() as u128
                     )
                 ),
             )?;

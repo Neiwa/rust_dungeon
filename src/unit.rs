@@ -12,9 +12,8 @@ pub struct Player {
     pub energy: u32,
     pub max_energy: u32,
     pub last_shot: u128,
-    pub fireball_cooldown: u128,
-    pub fireball_cost: u32,
     pub magic: Vec<Box<dyn Magic>>,
+    pub active_spell: usize,
 }
 
 impl Player {
@@ -24,10 +23,13 @@ impl Player {
             energy: 100,
             max_energy: 100,
             last_shot: 0,
-            fireball_cooldown: 4,
-            fireball_cost: 10,
             magic: vec![Box::new(FireballMagic::new())],
+            active_spell: 0,
         }
+    }
+
+    pub fn get_active_spell(&self) -> &Box<dyn Magic> {
+        &self.magic[self.active_spell]
     }
 }
 

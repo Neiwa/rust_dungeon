@@ -54,7 +54,7 @@ impl SphereMagic {
 
 impl Magic for SphereMagic {
     fn cost(&self) -> u32 {
-        2
+        5
     }
 
     fn cooldown(&self) -> u128 {

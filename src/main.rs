@@ -1,6 +1,6 @@
 use command::{AsCommand, Command};
+use console::{coord, AsSymbol, ConsoleUnit};
 use console::{coord::AsDirection, loader};
-use console::{AsSymbol, ConsoleUnit};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -10,6 +10,7 @@ use crossterm::{
 };
 
 use point::{AsPoint, Point};
+use rand::{thread_rng, Rng};
 use render_action::RenderAction;
 
 use std::{
@@ -45,7 +46,18 @@ struct Indicator {
     color: Color,
     bg_color: Color,
 }
+
 const BG_COLOR: Color = Color::Rgb { r: 4, g: 109, b: 0 };
+
+fn bg_color(_coord: Coord) -> Color {
+    // let r = thread_rng().gen_range(2..=6);
+    // let g = thread_rng().gen_range(100..=115);
+    // let b = 0;
+    let r = (2 + (_coord.x ^ _coord.y ^ 3498) % 4) as u8;
+    let g = (100 + (_coord.x ^ _coord.y ^ 4839) % 15) as u8;
+    let b = 0;
+    Color::Rgb { r, g, b }
+}
 
 fn main() -> io::Result<()> {
     let (cols, rows) = size()?;
@@ -110,14 +122,14 @@ fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Resul
         } => queue!(
             stdout,
             cursor::MoveTo(old.x as u16, old.y as u16),
-            style::PrintStyledContent(" ".on(BG_COLOR)),
+            style::PrintStyledContent(" ".on(bg_color(old))),
             cursor::MoveTo(new.x as u16, new.y as u16),
-            style::PrintStyledContent(symbol.with(color).on(BG_COLOR)),
+            style::PrintStyledContent(symbol.with(color).on(bg_color(new))),
         )?,
         RenderAction::Remove(coord) => queue!(
             stdout,
             cursor::MoveTo(coord.x as u16, coord.y as u16),
-            style::PrintStyledContent(" ".on(BG_COLOR)),
+            style::PrintStyledContent(" ".on(bg_color(coord))),
         )?,
         RenderAction::Create {
             symbol,
@@ -126,7 +138,7 @@ fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Resul
         } => queue!(
             stdout,
             cursor::MoveTo(coord.x as u16, coord.y as u16),
-            style::PrintStyledContent(symbol.with(color).on(BG_COLOR)),
+            style::PrintStyledContent(symbol.with(color).on(bg_color(coord))),
         )?,
     }
 
@@ -222,7 +234,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     for y in 0..rows {
         for x in 0..cols {
             let draw = match (x, y) {
-                (1, 1) => Some('▥'.with(Color::White).on(BG_COLOR)),
+                (1, 1) => Some('▥'.with(Color::White).on(bg_color(Coord::new(x, y)))),
                 (0, 0) => Some('╔'.magenta()),
                 (0, y) if y == rows - 1 => Some('╚'.magenta()),
                 (x, 0) if x == cols - 1 => Some('╗'.magenta()),
@@ -244,7 +256,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 queue!(
                     stdout,
                     cursor::MoveTo(x as u16, y as u16),
-                    style::PrintStyledContent(" ".on(BG_COLOR))
+                    style::PrintStyledContent(" ".on(bg_color(Coord::new(x, y))))
                 )?;
             }
         }
@@ -348,7 +360,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             for input in &input_tracker {
                 match input.as_command() {
                     Some(Command::Move(direction)) => step += direction.as_point(),
-                    Some(Command::Fireball(direction)) => {
+                    Some(Command::Evoke(direction)) => {
                         let mut cast_spell = false;
                         let magic = state.player.get_active_spell();
 
@@ -372,6 +384,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         if cast_spell {
                             state.player.last_shot = unit_ticker;
                         }
+                    }
+                    Some(Command::CycleSpell) => {
+                        state.player.active_spell =
+                            (state.player.active_spell + 1) % state.player.magic.len()
                     }
                     _ => {}
                 }

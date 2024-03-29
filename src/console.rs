@@ -122,10 +122,11 @@ impl AsCommand for KeyCode {
             KeyCode::Left | KeyCode::Char('a') => Some(Command::Move(Direction::Left)),
             KeyCode::Down | KeyCode::Char('s') => Some(Command::Move(Direction::Down)),
             KeyCode::Right | KeyCode::Char('d') => Some(Command::Move(Direction::Right)),
-            KeyCode::Char('i') => Some(Command::Fireball(Direction::Up)),
-            KeyCode::Char('j') => Some(Command::Fireball(Direction::Left)),
-            KeyCode::Char('k') => Some(Command::Fireball(Direction::Down)),
-            KeyCode::Char('l') => Some(Command::Fireball(Direction::Right)),
+            KeyCode::Char('i') => Some(Command::Evoke(Direction::Up)),
+            KeyCode::Char('j') => Some(Command::Evoke(Direction::Left)),
+            KeyCode::Char('k') => Some(Command::Evoke(Direction::Down)),
+            KeyCode::Char('l') => Some(Command::Evoke(Direction::Right)),
+            KeyCode::Char('o') => Some(Command::CycleSpell),
             _ => None,
         }
     }

@@ -40,6 +40,7 @@ struct Indicator {
     color: Color,
     bg_color: Color,
 }
+const BG_COLOR: Color = Color::Rgb { r: 4, g: 109, b: 0 };
 
 fn main() -> io::Result<()> {
     let (cols, rows) = size()?;
@@ -98,9 +99,9 @@ fn queue_unit_draw(stdout: &mut io::Stdout, unit: &dyn ConsoleUnit) -> io::Resul
     queue!(
         stdout,
         cursor::MoveTo(unit.last_coord().x as u16, unit.last_coord().y as u16),
-        style::PrintStyledContent(" ".black()),
+        style::PrintStyledContent(" ".with(BG_COLOR)),
         cursor::MoveTo(unit.coord().x as u16, unit.coord().y as u16),
-        style::PrintStyledContent(unit.symbol().with(unit.color())),
+        style::PrintStyledContent(unit.symbol().with(unit.color()).on(BG_COLOR)),
     )?;
 
     Ok(())
@@ -116,9 +117,9 @@ fn queue_action_draw(stdout: &mut io::Stdout, action: Action) -> io::Result<()> 
         } => queue!(
             stdout,
             cursor::MoveTo(old.x as u16, old.y as u16),
-            style::PrintStyledContent(" ".black()),
+            style::PrintStyledContent(" ".with(BG_COLOR).on(BG_COLOR)),
             cursor::MoveTo(new.x as u16, new.y as u16),
-            style::PrintStyledContent(symbol.with(color)),
+            style::PrintStyledContent(symbol.with(color).on(BG_COLOR)),
         )?,
     }
 
@@ -205,17 +206,30 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     for y in 0..rows {
         for x in 0..cols {
-            if (y == 0 || y == rows - 1) || (x == 0 || x == cols - 1) {
+            let draw = match (x, y) {
+                (1, 1) => Some('▥'.with(Color::White).on(BG_COLOR)),
+                (0, 0) => Some('╔'.magenta()),
+                (0, y) if y == rows - 1 => Some('╚'.magenta()),
+                (x, 0) if x == cols - 1 => Some('╗'.magenta()),
+                (x, y) if x == cols - 1 && y == rows - 1 => Some('╝'.magenta()),
+                (0, _) => Some('║'.magenta()),
+                (x, _) if x == cols - 1 => Some('║'.magenta()),
+                (_, 0) => Some('═'.magenta()),
+                (_, y) if y == rows - 1 => Some('═'.magenta()),
+                _ => None,
+            };
+
+            if let Some(content) = draw {
                 queue!(
                     stdout,
                     cursor::MoveTo(x as u16, y as u16),
-                    style::PrintStyledContent("█".magenta())
+                    style::PrintStyledContent(content)
                 )?;
-            } else if x == 1 && y == 1 {
+            } else {
                 queue!(
                     stdout,
                     cursor::MoveTo(x as u16, y as u16),
-                    style::PrintStyledContent("#".green())
+                    style::PrintStyledContent(" ".on(BG_COLOR))
                 )?;
             }
         }

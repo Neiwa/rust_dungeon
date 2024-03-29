@@ -8,7 +8,8 @@ use crossterm::{
     style::{self, Color, Stylize},
     terminal::{self, size, SetSize},
 };
-use fireball::Fireball;
+
+use magic::Spell;
 use point::{AsPoint, Point};
 use render_action::RenderAction;
 
@@ -22,6 +23,7 @@ use std::{
 mod command;
 mod console;
 mod fireball;
+mod magic;
 pub mod point;
 mod render_action;
 mod unit;
@@ -33,7 +35,7 @@ struct State {
     start: Instant,
     monsters: Vec<unit::Unit>,
     player: Player,
-    fireballs: Vec<Fireball>,
+    objects: Vec<Box<dyn Object>>,
 }
 
 struct Display<'a> {
@@ -157,7 +159,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         start: Instant::now(),
         score: 0,
         player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2)),
-        fireballs: Vec::new(),
         monsters: vec![
             Unit::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
             Unit::new(
@@ -179,6 +180,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 None,
             ),
         ],
+        objects: Vec::new(),
     };
 
     let display = Display {
@@ -275,7 +277,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut last_tick = 0;
     let mut tick = false;
     let mut last_fireball_tick = 0;
-    let mut fireball_tick = false;
+    let mut object_tick = false;
     let mut last_spawn_tick = 0;
     let mut spawn_tick = true;
 
@@ -296,7 +298,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         let fireball_ticker = elapsed.as_millis() / 100;
         if fireball_ticker > last_fireball_tick {
             last_fireball_tick = fireball_ticker;
-            fireball_tick = true;
+            object_tick = true;
         }
         let spawn_ticker = elapsed.as_secs() / 5;
         if spawn_ticker > last_spawn_tick {
@@ -343,31 +345,36 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
 
         if input_tracker.len() > 0 {
-            let prev_pos = state.player.location.as_coord();
-
             let mut step = Point::new(0.0, 0.0);
 
             for input in &input_tracker {
                 match input.as_command() {
                     Some(Command::Move(direction)) => step += direction.as_point(),
                     Some(Command::Fireball(direction)) => {
-                        if unit_ticker.saturating_sub(state.player.fireball_cooldown)
-                            >= state.player.last_shot
-                            && state.player.energy >= state.player.fireball_cost
-                        {
-                            let fireball = Fireball::new(
-                                state.player.location + direction.as_point(),
-                                direction,
-                            );
-                            render_actions.push_back(RenderAction::Create {
-                                symbol: fireball.symbol(),
-                                color: fireball.color(),
-                                coord: fireball.coord(),
-                            });
-                            state.fireballs.push(fireball);
+                        let magic = state
+                            .player
+                            .magic
+                            .iter()
+                            .find(|m| m.get_spell() == Spell::Fireball);
 
-                            state.player.last_shot = unit_ticker;
-                            state.player.energy -= state.player.fireball_cost;
+                        if let Some(fireball_magic) = magic {
+                            if unit_ticker.saturating_sub(fireball_magic.cooldown())
+                                >= state.player.last_shot
+                                && state.player.energy >= fireball_magic.cost()
+                            {
+                                let object = fireball_magic.evoke(state.player.location, direction);
+
+                                render_actions.push_back(RenderAction::Create {
+                                    symbol: object.symbol(),
+                                    color: object.color(),
+                                    coord: object.location().as_coord(),
+                                });
+
+                                state.objects.push(object);
+
+                                state.player.last_shot = unit_ticker;
+                                state.player.energy -= fireball_magic.cost();
+                            }
                         }
                     }
                     _ => {}
@@ -376,6 +383,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
             // Move
             if !player_moved && step != Point::new(0.0, 0.0) {
+                let prev_pos = state.player.location.as_coord();
                 let next_pos = state.player.location + step.normalize(state.player.speed());
                 let next_coord = next_pos.as_coord();
 
@@ -397,15 +405,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             }
         }
 
-        if fireball_tick {
-            fireball_tick = false;
+        if object_tick {
+            object_tick = false;
 
-            let fireball_len = state.fireballs.len();
+            let object_len = state.objects.len();
 
-            for fireball_ix in (0..fireball_len).rev() {
-                let mut fireball = state.fireballs.remove(fireball_ix);
-                let prev_coord = fireball.location.as_coord();
-                let new_pos = fireball.location + (fireball.direction.as_point() * fireball.speed);
+            for object_ix in (0..object_len).rev() {
+                let mut object = state.objects.remove(object_ix);
+                let prev_coord = object.location().as_coord();
+                let new_pos = object.location() + (object.direction().as_point() * object.speed());
 
                 let next_coord = new_pos.as_coord();
                 if next_coord.x > 0
@@ -421,22 +429,22 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
                             let monster = state.monsters.remove(monster_ix);
                             render_actions.push_back(RenderAction::Remove(monster.coord()));
-                            render_actions.push_back(RenderAction::Remove(fireball.coord()));
+                            render_actions.push_back(RenderAction::Remove(object.coord()));
                             hit = true;
                             break;
                         }
                     }
 
                     if !hit {
-                        fireball.location = new_pos;
+                        object.set_location(new_pos);
 
                         render_actions.push_back(RenderAction::Move {
-                            symbol: fireball.symbol(),
-                            color: fireball.color(),
+                            symbol: object.symbol(),
+                            color: object.color(),
                             old: prev_coord,
                             new: next_coord,
                         });
-                        state.fireballs.push(fireball);
+                        state.objects.push(object);
                     }
                 } else {
                     render_actions.push_back(RenderAction::Remove(prev_coord));

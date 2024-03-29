@@ -1,6 +1,7 @@
 use rand::random;
 
 use crate::{
+    magic::{FireballMagic, Magic, Spell},
     point::{AsPoint, Point},
     Coord, Direction,
 };
@@ -12,6 +13,7 @@ pub struct Player {
     pub last_shot: u128,
     pub fireball_cooldown: u128,
     pub fireball_cost: u32,
+    pub magic: Vec<Box<dyn Magic>>,
 }
 
 impl Player {
@@ -23,6 +25,7 @@ impl Player {
             last_shot: 0,
             fireball_cooldown: 4,
             fireball_cost: 10,
+            magic: vec![Box::new(FireballMagic::new())],
         }
     }
 }
@@ -32,6 +35,14 @@ pub struct Unit {
     pub logic: usize,
     pub id: usize,
     pub speed: f64,
+}
+
+pub trait Object {
+    fn location(&self) -> Point;
+    fn direction(&self) -> Direction;
+    fn speed(&self) -> f64;
+    fn set_location(&mut self, location: Point);
+    fn get_spell(&self) -> Spell;
 }
 
 pub trait UnitLogic {

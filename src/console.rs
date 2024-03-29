@@ -3,7 +3,8 @@ pub mod coord;
 use crossterm::{event::KeyCode, style::Color};
 
 use crate::{
-    command::{AsCommand, Command}, fireball::Fireball, AsCoord, AsDirection, Coord, Direction, Player, Unit
+    command::{AsCommand, Command},
+    AsCoord, AsDirection, Coord, Direction, Object, Player, Unit,
 };
 
 pub trait ConsoleUnit {
@@ -63,17 +64,21 @@ impl ConsoleUnit for Unit {
     }
 }
 
-impl ConsoleUnit for Fireball {
+impl ConsoleUnit for dyn Object {
     fn color(&self) -> Color {
-        Color::Red
+        match self.get_spell() {
+            crate::magic::Spell::Fireball => Color::Red,
+        }
     }
 
     fn symbol(&self) -> char {
-        '🔥'
+        match self.get_spell() {
+            crate::magic::Spell::Fireball => '🔥',
+        }
     }
 
     fn coord(&self) -> Coord {
-        self.location.as_coord()
+        self.location().as_coord()
     }
 }
 
@@ -113,4 +118,3 @@ pub fn loader(current: u128, target: u128, range: u128) -> char {
         .clamp(0.0, (LOADING_SYMBOLS.len() - 1) as f32) as usize;
     LOADING_SYMBOLS[val]
 }
-

@@ -1,10 +1,9 @@
 use rand::random;
 
-use crate::{point::{AsPoint, Point}, AsCoord, Coord, Direction};
+use crate::{point::{AsPoint, Point}, Coord, Direction};
 
 pub struct Player {
     pub location: Point,
-    pub last_coord: Coord,
     pub energy: u32,
     pub last_shot: u128,
 }
@@ -13,7 +12,6 @@ impl Player {
     pub fn new(coord: Coord) -> Self {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
-            last_coord: coord,
             energy: 100,
             last_shot: 0,
         }
@@ -22,7 +20,6 @@ impl Player {
 
 pub struct Unit {
     pub location: Point,
-    pub last_coord: Coord,
     pub logic: usize,
     pub id: usize,
     pub speed: f64,
@@ -60,7 +57,6 @@ impl Monster for Unit {
 
 impl UnitLogic for Unit {
     fn step(&mut self, step: Point) {
-        self.last_coord = self.location.as_coord();
         self.location = step;
     }
     
@@ -71,7 +67,6 @@ impl UnitLogic for Unit {
 
 impl UnitLogic for Player {
     fn step(&mut self, step: Point) {
-        self.last_coord = self.location.as_coord();
         self.location = step;
     }
     
@@ -88,7 +83,6 @@ impl Unit {
     pub fn new(coord: Coord, logic: Option<usize>, speed: Option<f64>) -> Self {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
-            last_coord: coord,
             logic: logic.unwrap_or(100),
             speed: speed.unwrap_or(0.8),
             id: random(),

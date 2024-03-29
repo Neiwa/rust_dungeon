@@ -10,7 +10,6 @@ pub trait ConsoleUnit {
     fn color(&self) -> Color;
     fn symbol(&self) -> char;
     fn coord(&self) -> Coord;
-    fn last_coord(&self) -> Coord;
 }
 
 impl ConsoleUnit for Player {
@@ -24,10 +23,6 @@ impl ConsoleUnit for Player {
 
     fn coord(&self) -> Coord {
         self.location.as_coord()
-    }
-
-    fn last_coord(&self) -> Coord {
-        self.last_coord
     }
 }
 
@@ -66,10 +61,6 @@ impl ConsoleUnit for Unit {
     fn coord(&self) -> Coord {
         self.location.as_coord()
     }
-
-    fn last_coord(&self) -> Coord {
-        self.last_coord
-    }
 }
 
 impl ConsoleUnit for Fireball {
@@ -83,10 +74,6 @@ impl ConsoleUnit for Fireball {
 
     fn coord(&self) -> Coord {
         self.location.as_coord()
-    }
-
-    fn last_coord(&self) -> Coord {
-        todo!()
     }
 }
 

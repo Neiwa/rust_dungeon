@@ -100,18 +100,6 @@ fn queue_value_draw(
     Ok(())
 }
 
-fn queue_unit_draw(stdout: &mut io::Stdout, unit: &dyn ConsoleUnit) -> io::Result<()> {
-    queue!(
-        stdout,
-        cursor::MoveTo(unit.last_coord().x as u16, unit.last_coord().y as u16),
-        style::PrintStyledContent(" ".with(BG_COLOR)),
-        cursor::MoveTo(unit.coord().x as u16, unit.coord().y as u16),
-        style::PrintStyledContent(unit.symbol().with(unit.color()).on(BG_COLOR)),
-    )?;
-
-    Ok(())
-}
-
 fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Result<()> {
     match action {
         RenderAction::Move {
@@ -147,7 +135,14 @@ fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Resul
 
 fn queue_monsters_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()> {
     for monster in &state.monsters {
-        queue_unit_draw(stdout, monster)?;
+        queue_action_draw(
+            stdout,
+            RenderAction::Create {
+                symbol: monster.symbol(),
+                color: monster.color(),
+                coord: monster.coord(),
+            },
+        )?;
     }
 
     Ok(())
@@ -266,7 +261,14 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     )?;
     queue_monsters_draw(stdout, &state)?;
 
-    queue_unit_draw(stdout, &state.player)?;
+    queue_action_draw(
+        stdout,
+        RenderAction::Create {
+            symbol: state.player.symbol(),
+            color: state.player.color(),
+            coord: state.player.coord(),
+        },
+    )?;
 
     stdout.flush()?;
 

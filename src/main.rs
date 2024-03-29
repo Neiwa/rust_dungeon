@@ -1,6 +1,6 @@
 use command::{AsCommand, Command};
-use console::{coord, AsSymbol, ConsoleUnit};
 use console::{coord::AsDirection, loader};
+use console::{AsSymbol, ConsoleUnit};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -13,6 +13,7 @@ use point::{AsPoint, Point};
 use rand::{thread_rng, Rng};
 use render_action::RenderAction;
 
+use std::collections::HashSet;
 use std::{
     collections::{HashMap, VecDeque},
     fs::File,
@@ -53,8 +54,8 @@ fn bg_color(_coord: Coord) -> Color {
     // let r = thread_rng().gen_range(2..=6);
     // let g = thread_rng().gen_range(100..=115);
     // let b = 0;
-    let r = (2 + (_coord.x ^ _coord.y ^ 3498) % 4) as u8;
-    let g = (100 + (_coord.x ^ _coord.y ^ 4839) % 15) as u8;
+    let r = (2 + (_coord.x * _coord.y ^ 348798) % 4) as u8;
+    let g = (100 + (_coord.x * _coord.y ^ 2344839) % 15) as u8;
     let b = 0;
     Color::Rgb { r, g, b }
 }
@@ -112,6 +113,73 @@ fn queue_value_draw(
     Ok(())
 }
 
+fn queue_actions_draw(
+    stdout: &mut io::Stdout,
+    render_actions: &VecDeque<RenderAction>,
+) -> io::Result<()> {
+    let mut clear: HashSet<Coord> = HashSet::new();
+    let mut skip_clear: HashSet<Coord> = HashSet::new();
+
+    for render in render_actions {
+        match render {
+            RenderAction::Move {
+                old, new, symbol, ..
+            } => {
+                for i in 0..symbol.len_utf8() {
+                    clear.insert(*old + Coord::new(1, 0) * i);
+                }
+                for i in 0..symbol.len_utf8() {
+                    skip_clear.insert(*new + Coord::new(1, 0) * i);
+                }
+            }
+            RenderAction::Remove { coord, symbol } => {
+                for i in 0..symbol.len_utf8() {
+                    clear.insert(*coord + Coord::new(1, 0) * i);
+                }
+            }
+            RenderAction::Create { coord, symbol, .. } => {
+                for i in 0..symbol.len_utf8() {
+                    skip_clear.insert(*coord + Coord::new(1, 0) * i);
+                }
+            }
+        };
+    }
+
+    for coord in clear {
+        if !skip_clear.contains(&coord) {
+            queue!(
+                stdout,
+                cursor::MoveTo(coord.x as u16, coord.y as u16),
+                style::PrintStyledContent(" ".on(bg_color(coord))),
+            )?;
+        }
+    }
+
+    for render in render_actions {
+        match *render {
+            RenderAction::Move {
+                symbol, color, new, ..
+            } => queue!(
+                stdout,
+                cursor::MoveTo(new.x as u16, new.y as u16),
+                style::PrintStyledContent(symbol.with(color).on(bg_color(new))),
+            )?,
+            RenderAction::Create {
+                symbol,
+                color,
+                coord,
+            } => queue!(
+                stdout,
+                cursor::MoveTo(coord.x as u16, coord.y as u16),
+                style::PrintStyledContent(symbol.with(color).on(bg_color(coord))),
+            )?,
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
 fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Result<()> {
     match action {
         RenderAction::Move {
@@ -126,7 +194,7 @@ fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Resul
             cursor::MoveTo(new.x as u16, new.y as u16),
             style::PrintStyledContent(symbol.with(color).on(bg_color(new))),
         )?,
-        RenderAction::Remove(coord) => queue!(
+        RenderAction::Remove { coord, .. } => queue!(
             stdout,
             cursor::MoveTo(coord.x as u16, coord.y as u16),
             style::PrintStyledContent(" ".on(bg_color(coord))),
@@ -410,8 +478,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
 
         if object_tick {
-            object_tick = false;
-
             let object_len = state.objects.len();
 
             for object_ix in (0..object_len).rev() {
@@ -432,8 +498,14 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                             state.score += 1;
 
                             let monster = state.monsters.remove(monster_ix);
-                            render_actions.push_back(RenderAction::Remove(monster.coord()));
-                            render_actions.push_back(RenderAction::Remove(object.coord()));
+                            render_actions.push_back(RenderAction::Remove {
+                                coord: monster.coord(),
+                                symbol: monster.symbol(),
+                            });
+                            render_actions.push_back(RenderAction::Remove {
+                                coord: object.coord(),
+                                symbol: object.symbol(),
+                            });
                             hit = true;
                             break;
                         }
@@ -451,14 +523,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         state.objects.push(object);
                     }
                 } else {
-                    render_actions.push_back(RenderAction::Remove(prev_coord));
+                    render_actions.push_back(RenderAction::Remove {
+                        coord: prev_coord,
+                        symbol: object.symbol(),
+                    });
                 }
             }
         }
 
         if tick {
-            tick = false;
-
             if !player_moved {
                 if state.player.energy < state.player.max_energy {
                     state.player.energy += 1;
@@ -512,8 +585,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
 
         if spawn_tick {
-            spawn_tick = false;
-
             if state.monsters.len() < 3 {
                 let monster = Unit::new(Coord::new(4, 4), None, None);
 
@@ -527,10 +598,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             }
         }
 
-        if render_actions.len() > 0 {
-            while let Some(action) = render_actions.pop_front() {
-                queue_action_draw(stdout, action)?;
-            }
+        if tick || spawn_tick || object_tick || render_actions.len() > 0 {
+            queue_actions_draw(stdout, &render_actions)?;
 
             queue_value_draw(
                 stdout,
@@ -575,6 +644,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
             stdout.flush()?;
         }
+        tick = false;
+        spawn_tick = false;
+        object_tick = false;
 
         if state.player.coord() == Coord::new(1, 1) || exit {
             break;

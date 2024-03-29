@@ -54,12 +54,23 @@ impl ops::AddAssign<Coord> for Coord {
     }
 }
 
+impl ops::Mul<usize> for Coord {
+    type Output = Coord;
+
+    fn mul(self, rhs: usize) -> Self::Output {
+        Coord {
+            x: self.x * rhs as i32,
+            y: self.y * rhs as i32,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Direction {
     Up,
     Down,
     Left,
-    Right
+    Right,
 }
 
 impl AsCoord for Direction {

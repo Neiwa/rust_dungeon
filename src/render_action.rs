@@ -9,7 +9,10 @@ pub enum RenderAction {
         old: Coord,
         new: Coord,
     },
-    Remove(Coord),
+    Remove {
+        coord: Coord,
+        symbol: char,
+    },
     Create {
         symbol: char,
         color: Color,

@@ -62,10 +62,16 @@ impl Magic for FireballMagic {
     }
 
     fn evoke(&self, location: Point, direction: Direction) -> Box<dyn Object> {
-        Box::new(FireballObject::new(
-            location + direction.as_point(),
-            direction,
-        ))
+        match direction {
+            Direction::Up | Direction::Down => Box::new(FireballObject::new(
+                location + direction.as_point(),
+                direction,
+            )),
+            Direction::Left | Direction::Right => Box::new(FireballObject::new(
+                location + direction.as_point() * 2,
+                direction,
+            )),
+        }
     }
 
     fn get_spell(&self) -> Spell {

@@ -5,6 +5,8 @@ use crate::{point::{AsPoint, Point}, AsCoord, Coord, Direction};
 pub struct Player {
     pub location: Point,
     pub last_coord: Coord,
+    pub energy: u32,
+    pub last_shot: u128,
 }
 
 impl Player {
@@ -12,6 +14,8 @@ impl Player {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
             last_coord: coord,
+            energy: 100,
+            last_shot: 0,
         }
     }
 }

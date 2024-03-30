@@ -305,16 +305,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     for y in 0..rows {
         for x in 0..2 * cols - 2 {
             let content = match (x, y) {
-                (1, 1) => "▥".with(Color::White).on(bg_color(Coord::new(x.into(), y))),
                 (0, 0) => "╔".magenta(),
-                (0, y) if y == rows - 1 => "╚".magenta(),
+                (0, y) if y == rows - 1 => "╚═".magenta(),
                 (x, 0) if x == 2 * cols - 3 => "╗".magenta(),
                 (x, y) if x == 2 * cols - 3 && y == rows - 1 => "╝".magenta(),
                 (0, _) => "║".magenta(),
                 (x, _) if x == 2 * cols - 3 => "║".magenta(),
                 (_, 0) => "═".magenta(),
                 (_, y) if y == rows - 1 => "═".magenta(),
-                _ => " ".on(bg_color(Coord::new(x.into(), y))),
+                _ => " ".on(bg_color(Coord::new(2 * x - 1, y))),
             };
 
             queue!(
@@ -345,11 +344,18 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 color: m.color(),
                 coord: m.coord(),
             })
-            .chain([RenderAction::Create {
-                symbol: state.player.symbol(),
-                color: state.player.color(),
-                coord: state.player.coord(),
-            }]),
+            .chain([
+                RenderAction::Create {
+                    symbol: state.player.symbol(),
+                    color: state.player.color(),
+                    coord: state.player.coord(),
+                },
+                RenderAction::Create {
+                    symbol: '🚪',
+                    color: Color::White,
+                    coord: Coord::new(1, 1),
+                },
+            ]),
     )?;
 
     stdout.flush()?;
@@ -477,13 +483,21 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                                 state.player.active_spell_evoke(direction, unit_ticker);
 
                             while let Some(object) = objects.pop() {
-                                render_actions.push_back(RenderAction::Create {
-                                    symbol: object.symbol(),
-                                    color: object.color(),
-                                    coord: object.location().as_coord(),
-                                });
+                                let object_coord = object.location().as_coord();
 
-                                state.objects.push(object);
+                                if object_coord.x > 0
+                                    && object_coord.x < cols - 1
+                                    && object_coord.y > 0
+                                    && object_coord.y < rows - 1
+                                {
+                                    render_actions.push_back(RenderAction::Create {
+                                        symbol: object.symbol(),
+                                        color: object.color(),
+                                        coord: object_coord,
+                                    });
+
+                                    state.objects.push(object);
+                                }
                             }
                         }
                     }

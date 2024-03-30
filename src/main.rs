@@ -14,14 +14,13 @@ use point::{AsPoint, Point};
 use render_action::RenderAction;
 
 use std::collections::HashSet;
+
 use std::{
     collections::{HashMap, VecDeque},
     fs::File,
     io::{self, Write},
     time::{Duration, Instant},
 };
-
-use unicode_width::UnicodeWidthChar;
 
 mod command;
 mod console;
@@ -174,35 +173,36 @@ fn queue_spells_draw(
     Ok(())
 }
 
-fn queue_actions_draw(
-    stdout: &mut io::Stdout,
-    render_actions: &VecDeque<RenderAction>,
-) -> io::Result<()> {
+fn queue_actions_draw<I>(stdout: &mut io::Stdout, render_actions: I) -> io::Result<()>
+where
+    I: Iterator<Item = RenderAction>,
+{
     let mut clear: HashSet<Coord> = HashSet::new();
     let mut skip_clear: HashSet<Coord> = HashSet::new();
+    let mut renders = Vec::new();
 
     for render in render_actions {
         match render {
             RenderAction::Move {
-                old, new, symbol, ..
+                old,
+                new,
+                symbol,
+                color,
             } => {
-                let width = UnicodeWidthChar::width(*symbol).unwrap_or(0);
-                for i in 0..width {
-                    clear.insert(*old + Coord::new(1, 0) * i);
-                }
-                for i in 0..width {
-                    skip_clear.insert(*new + Coord::new(1, 0) * i);
-                }
+                clear.insert(old);
+                skip_clear.insert(new);
+                renders.push((new, symbol, color));
             }
-            RenderAction::Remove { coord, symbol } => {
-                for i in 0..UnicodeWidthChar::width(*symbol).unwrap_or(0) {
-                    clear.insert(*coord + Coord::new(1, 0) * i);
-                }
+            RenderAction::Remove { coord, .. } => {
+                clear.insert(coord);
             }
-            RenderAction::Create { coord, symbol, .. } => {
-                for i in 0..UnicodeWidthChar::width(*symbol).unwrap_or(0) {
-                    skip_clear.insert(*coord + Coord::new(1, 0) * i);
-                }
+            RenderAction::Create {
+                coord,
+                symbol,
+                color,
+            } => {
+                skip_clear.insert(coord);
+                renders.push((coord, symbol, color));
             }
         };
     }
@@ -211,80 +211,21 @@ fn queue_actions_draw(
         if !skip_clear.contains(&coord) {
             queue!(
                 stdout,
-                cursor::MoveTo(coord.x as u16, coord.y as u16),
-                style::PrintStyledContent(' '.on(bg_color(coord))),
+                cursor::MoveTo((2 * coord.x - 1) as u16, coord.y as u16),
+                style::PrintStyledContent(' '.on(bg_color(Coord::new(coord.x * 2 - 1, coord.y)))),
+                style::PrintStyledContent(' '.on(bg_color(Coord::new(coord.x * 2, coord.y)))),
             )?;
         }
     }
 
-    for render in render_actions {
-        match *render {
-            RenderAction::Move {
-                symbol, color, new, ..
-            } => queue!(
+    for render in renders {
+        match render {
+            (coord, symbol, color) => queue!(
                 stdout,
-                cursor::MoveTo(new.x as u16, new.y as u16),
-                style::PrintStyledContent(symbol.with(color).on(bg_color(new))),
-            )?,
-            RenderAction::Create {
-                symbol,
-                color,
-                coord,
-            } => queue!(
-                stdout,
-                cursor::MoveTo(coord.x as u16, coord.y as u16),
+                cursor::MoveTo((2 * coord.x - 1) as u16, coord.y as u16),
                 style::PrintStyledContent(symbol.with(color).on(bg_color(coord))),
             )?,
-            _ => {}
         }
-    }
-
-    Ok(())
-}
-
-fn queue_action_draw(stdout: &mut io::Stdout, action: RenderAction) -> io::Result<()> {
-    match action {
-        RenderAction::Move {
-            symbol,
-            color,
-            old,
-            new,
-        } => queue!(
-            stdout,
-            cursor::MoveTo(old.x as u16, old.y as u16),
-            style::PrintStyledContent(" ".on(bg_color(old))),
-            cursor::MoveTo(new.x as u16, new.y as u16),
-            style::PrintStyledContent(symbol.with(color).on(bg_color(new))),
-        )?,
-        RenderAction::Remove { coord, .. } => queue!(
-            stdout,
-            cursor::MoveTo(coord.x as u16, coord.y as u16),
-            style::PrintStyledContent(" ".on(bg_color(coord))),
-        )?,
-        RenderAction::Create {
-            symbol,
-            color,
-            coord,
-        } => queue!(
-            stdout,
-            cursor::MoveTo(coord.x as u16, coord.y as u16),
-            style::PrintStyledContent(symbol.with(color).on(bg_color(coord))),
-        )?,
-    }
-
-    Ok(())
-}
-
-fn queue_monsters_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()> {
-    for monster in &state.monsters {
-        queue_action_draw(
-            stdout,
-            RenderAction::Create {
-                symbol: monster.symbol(),
-                color: monster.color(),
-                coord: monster.coord(),
-            },
-        )?;
     }
 
     Ok(())
@@ -292,7 +233,7 @@ fn queue_monsters_draw(stdout: &mut io::Stdout, state: &State) -> io::Result<()>
 
 fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let (t_cols, t_rows) = size()?;
-    let cols = (t_cols as i32).clamp(0, 70);
+    let cols = ((t_cols / 2) as i32).clamp(0, 30);
     let rows = (t_rows as i32).clamp(0, 30);
 
     let mut state = State {
@@ -328,7 +269,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             (
                 "clock",
                 Indicator {
-                    coord: Coord::new(cols as i32 - 5, 0),
+                    coord: Coord::new((2 * cols - 7).into(), 0),
                     color: Color::White,
                     bg_color: Color::Magenta,
                 },
@@ -352,7 +293,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             (
                 "energy",
                 Indicator {
-                    coord: Coord::new(cols as i32 - 8, rows as i32 - 1),
+                    coord: Coord::new((2 * cols - 10).into(), rows as i32 - 1),
                     color: Color::White,
                     bg_color: Color::Magenta,
                 },
@@ -362,18 +303,18 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     for y in 0..rows {
-        for x in 0..cols {
+        for x in 0..2 * cols - 2 {
             let content = match (x, y) {
-                (1, 1) => '▥'.with(Color::White).on(bg_color(Coord::new(x, y))),
-                (0, 0) => '╔'.magenta(),
-                (0, y) if y == rows - 1 => '╚'.magenta(),
-                (x, 0) if x == cols - 1 => '╗'.magenta(),
-                (x, y) if x == cols - 1 && y == rows - 1 => '╝'.magenta(),
-                (0, _) => '║'.magenta(),
-                (x, _) if x == cols - 1 => '║'.magenta(),
-                (_, 0) => '═'.magenta(),
-                (_, y) if y == rows - 1 => '═'.magenta(),
-                _ => ' '.on(bg_color(Coord::new(x, y))),
+                (1, 1) => "▥".with(Color::White).on(bg_color(Coord::new(x.into(), y))),
+                (0, 0) => "╔".magenta(),
+                (0, y) if y == rows - 1 => "╚".magenta(),
+                (x, 0) if x == 2 * cols - 3 => "╗".magenta(),
+                (x, y) if x == 2 * cols - 3 && y == rows - 1 => "╝".magenta(),
+                (0, _) => "║".magenta(),
+                (x, _) if x == 2 * cols - 3 => "║".magenta(),
+                (_, 0) => "═".magenta(),
+                (_, y) if y == rows - 1 => "═".magenta(),
+                _ => " ".on(bg_color(Coord::new(x.into(), y))),
             };
 
             queue!(
@@ -393,15 +334,22 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         display.status_indicators.get("score"),
         format!("{:>3}", state.score),
     )?;
-    queue_monsters_draw(stdout, &state)?;
 
-    queue_action_draw(
+    queue_actions_draw(
         stdout,
-        RenderAction::Create {
-            symbol: state.player.symbol(),
-            color: state.player.color(),
-            coord: state.player.coord(),
-        },
+        state
+            .monsters
+            .iter()
+            .map(|m| RenderAction::Create {
+                symbol: m.symbol(),
+                color: m.color(),
+                coord: m.coord(),
+            })
+            .chain([RenderAction::Create {
+                symbol: state.player.symbol(),
+                color: state.player.color(),
+                coord: state.player.coord(),
+            }]),
     )?;
 
     stdout.flush()?;
@@ -469,7 +417,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
                 let next_coord = new_pos.as_coord();
                 if next_coord.x > 0
-                    && next_coord.x < cols - 2
+                    && next_coord.x < cols - 1
                     && next_coord.y > 0
                     && next_coord.y < rows - 1
                 {
@@ -563,7 +511,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 let next_coord = next_pos.as_coord();
 
                 if next_coord.x > 0
-                    && next_coord.x < cols - 2
+                    && next_coord.x < cols - 1
                     && next_coord.y > 0
                     && next_coord.y < rows - 1
                 {
@@ -594,7 +542,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 let next_coord = new_pos.as_coord();
 
                 if next_coord.x > 0
-                    && next_coord.x < cols - 2
+                    && next_coord.x < cols - 1
                     && next_coord.y > 0
                     && next_coord.y < rows - 1
                 {
@@ -646,7 +594,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
 
         if tick || spawn_tick || object_tick || render_actions.len() > 0 {
-            queue_actions_draw(stdout, &render_actions)?;
+            queue_actions_draw(stdout, render_actions.into_iter())?;
 
             queue_value_draw(
                 stdout,

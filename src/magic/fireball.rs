@@ -71,16 +71,10 @@ impl Magic for FireballMagic {
     ) -> Vec<Box<dyn Object>> {
         self.last_evoke = Some(ticker);
 
-        vec![match direction {
-            Direction::Up | Direction::Down => Box::new(FireballObject::new(
-                location + direction.as_point(),
-                direction.as_point(),
-            )),
-            Direction::Left | Direction::Right => Box::new(FireballObject::new(
-                location + direction.as_point() * 2,
-                direction.as_point(),
-            )),
-        }]
+        vec![Box::new(FireballObject::new(
+            location + direction.as_point(),
+            direction.as_point(),
+        ))]
     }
 
     fn get_spell(&self) -> Spell {

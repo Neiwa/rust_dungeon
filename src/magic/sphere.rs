@@ -71,16 +71,10 @@ impl Magic for SphereMagic {
     ) -> Vec<Box<dyn Object>> {
         self.last_evoke = Some(ticker);
 
-        vec![match direction {
-            Direction::Up | Direction::Down => Box::new(SphereObject::new(
-                location + direction.as_point(),
-                direction,
-            )),
-            Direction::Left | Direction::Right => Box::new(SphereObject::new(
-                location + direction.as_point() * 2,
-                direction,
-            )),
-        }]
+        vec![Box::new(SphereObject::new(
+            location + direction.as_point(),
+            direction,
+        ))]
     }
 
     fn get_spell(&self) -> Spell {

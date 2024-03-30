@@ -1,6 +1,6 @@
 use command::{AsCommand, Command};
+use console::coord::AsDirection;
 use console::keyboard_state::KeyboardTracker;
-use console::{coord::AsDirection, loader};
 use console::{AsSymbol, ConsoleUnit};
 use crossterm::{
     cursor,
@@ -29,7 +29,7 @@ mod magic;
 pub mod point;
 mod render_action;
 mod unit;
-use crate::console::coord::*;
+use crate::console::{coord::*, loader_reverse, AsColor};
 use crate::unit::*;
 
 struct State {
@@ -106,6 +106,70 @@ fn queue_value_draw(
         cursor::MoveTo(ind.coord.x as u16, ind.coord.y as u16),
         style::PrintStyledContent(value.with(ind.color).on(ind.bg_color)),
     )?;
+
+    Ok(())
+}
+
+fn queue_spells_draw(
+    stdout: &mut io::Stdout,
+    indicator: Option<&Indicator>,
+    player: &Player,
+    ticker: u128,
+) -> io::Result<()> {
+    if indicator.is_none() {
+        return Ok(());
+    }
+
+    let ind = indicator.unwrap();
+
+    queue!(
+        stdout,
+        cursor::MoveTo(ind.coord.x as u16, ind.coord.y as u16)
+    )?;
+
+    let spell_len = player.spells.len();
+    for i in 0..spell_len {
+        let spell = &player.spells[i];
+        let is_active = i == player.active_spell;
+
+        let (color, bg_color) = match (is_active, player.energy >= spell.cost()) {
+            (true, true) => (Color::DarkMagenta, ind.color),
+            (true, false) => (Color::DarkGrey, ind.color),
+            (false, true) => (ind.color, ind.bg_color),
+            (false, false) => (Color::Grey, ind.bg_color),
+        };
+
+        if i > 0 {
+            queue!(
+                stdout,
+                style::PrintStyledContent("═".with(ind.bg_color).on(Color::Black))
+            )?;
+        }
+        queue!(
+            stdout,
+            style::PrintStyledContent(
+                spell
+                    .get_spell()
+                    .as_symbol()
+                    .with(spell.get_spell().as_color())
+                    .on(bg_color)
+            ),
+            style::PrintStyledContent(
+                format!(
+                    "{}",
+                    loader_reverse(
+                        spell.cooldown() - spell.remaining_cooldown(ticker),
+                        spell.cooldown(),
+                        spell.cooldown()
+                    ),
+                )
+                .with(spell.get_spell().as_color())
+                .on(bg_color)
+            ),
+            style::PrintStyledContent(format!("{:0>2}", spell.cost()).with(color).on(bg_color)),
+            style::PrintStyledContent("═".with(ind.bg_color).on(Color::Black))
+        )?;
+    }
 
     Ok(())
 }
@@ -278,7 +342,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 },
             ),
             (
-                "player_pos",
+                "spells",
                 Indicator {
                     coord: Coord::new(5, rows as i32 - 1),
                     color: Color::White,
@@ -288,7 +352,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             (
                 "energy",
                 Indicator {
-                    coord: Coord::new(cols as i32 - 20, rows as i32 - 1),
+                    coord: Coord::new(cols as i32 - 8, rows as i32 - 1),
                     color: Color::White,
                     bg_color: Color::Magenta,
                 },
@@ -475,9 +539,19 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                             }
                         }
                     }
-                    Some(Command::CycleSpell) => {
+                    Some(Command::CycleSpell(false)) => {
+                        state.player.active_spell =
+                            (state.player.active_spell + state.player.spells.len() - 1)
+                                % state.player.spells.len()
+                    }
+                    Some(Command::CycleSpell(true)) => {
                         state.player.active_spell =
                             (state.player.active_spell + 1) % state.player.spells.len()
+                    }
+                    Some(Command::SelectSpell(index)) => {
+                        if index < state.player.spells.len() {
+                            state.player.active_spell = index;
+                        }
                     }
                     _ => {}
                 }
@@ -576,12 +650,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
             queue_value_draw(
                 stdout,
-                display.status_indicators.get("player_pos"),
-                format!("{:?}", state.player.coord()),
-            )?;
-
-            queue_value_draw(
-                stdout,
                 display.status_indicators.get("clock"),
                 format!("{:>3}", elapsed.as_secs()),
             )?;
@@ -592,27 +660,17 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 format!("{:>3}", state.score),
             )?;
 
-            let spell = state.player.get_active_spell();
+            queue_spells_draw(
+                stdout,
+                display.status_indicators.get("spells"),
+                &state.player,
+                unit_ticker,
+            )?;
 
             queue_value_draw(
                 stdout,
                 display.status_indicators.get("energy"),
-                format!(
-                    "🧪 {:0>3}  {} {} {:0>2} {}",
-                    state.player.energy,
-                    loader(
-                        spell.cooldown() - spell.remaining_cooldown(unit_ticker),
-                        spell.cooldown(),
-                        spell.cooldown()
-                    ),
-                    spell.get_spell().as_symbol(),
-                    state.player.energy / spell.cost(),
-                    loader(
-                        state.player.energy as u128 % spell.cost() as u128,
-                        spell.cost() as u128,
-                        spell.cost() as u128
-                    )
-                ),
+                format!("🧪 {:0>3}", state.player.energy),
             )?;
 
             stdout.flush()?;

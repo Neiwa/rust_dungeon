@@ -131,7 +131,7 @@ impl AsCommand for KeyCode {
             KeyCode::Char('j') => Some(Command::Evoke(Direction::Left)),
             KeyCode::Char('k') => Some(Command::Evoke(Direction::Down)),
             KeyCode::Char('l') => Some(Command::Evoke(Direction::Right)),
-            KeyCode::Char('o') => Some(Command::CycleSpell),
+            KeyCode::Char('o') => Some(Command::CycleSpell(true)),
             _ => None,
         }
     }
@@ -141,7 +141,17 @@ impl AsCommand for KeyboardState {
     fn as_command(&self) -> Option<Command> {
         match self {
             KeyboardState::Press(code) => match code {
-                KeyCode::Char('o') => Some(Command::CycleSpell),
+                KeyCode::Char('u') => Some(Command::CycleSpell(false)),
+                KeyCode::Char('o') => Some(Command::CycleSpell(true)),
+                KeyCode::Char('1') => Some(Command::SelectSpell(0)),
+                KeyCode::Char('2') => Some(Command::SelectSpell(1)),
+                KeyCode::Char('3') => Some(Command::SelectSpell(2)),
+                KeyCode::Char('4') => Some(Command::SelectSpell(3)),
+                KeyCode::Char('5') => Some(Command::SelectSpell(4)),
+                KeyCode::Char('6') => Some(Command::SelectSpell(5)),
+                KeyCode::Char('7') => Some(Command::SelectSpell(6)),
+                KeyCode::Char('8') => Some(Command::SelectSpell(7)),
+                KeyCode::Char('9') => Some(Command::SelectSpell(8)),
                 _ => None,
             },
             KeyboardState::Release(_) => None,
@@ -167,4 +177,10 @@ pub fn loader(current: u128, target: u128, range: u128) -> char {
         * LOADING_SYMBOLS.len() as f32)
         .clamp(0.0, (LOADING_SYMBOLS.len() - 1) as f32) as usize;
     LOADING_SYMBOLS[val]
+}
+pub fn loader_reverse(current: u128, target: u128, range: u128) -> char {
+    let val = ((range.saturating_sub(target.saturating_sub(current))) as f32 / range as f32
+        * LOADING_SYMBOLS.len() as f32)
+        .clamp(0.0, (LOADING_SYMBOLS.len() - 1) as f32) as usize;
+    LOADING_SYMBOLS[LOADING_SYMBOLS.len() - val - 1]
 }

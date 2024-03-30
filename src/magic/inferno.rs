@@ -18,7 +18,7 @@ impl InfernoMagic {
 
 impl Magic for InfernoMagic {
     fn cost(&self) -> u32 {
-        100
+        80
     }
 
     fn cooldown(&self) -> u128 {

@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent};
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub enum KeyboardState {
@@ -30,7 +30,6 @@ impl KeyboardTracker {
 
     pub fn calculate_state(&mut self) -> &HashSet<KeyboardState> {
         let mut new_state = HashSet::new();
-        let mut pressed_this_tick: HashSet<KeyCode> = HashSet::new();
         let mut still_active_keys = self.pressed_keys.clone();
 
         while let Some(event) = self.current_events.pop_front() {
@@ -38,8 +37,7 @@ impl KeyboardTracker {
                 crossterm::event::KeyEventKind::Press => {
                     if !self.pressed_keys.contains(&event.code) {
                         new_state.insert(KeyboardState::Press(event.code));
-
-                        pressed_this_tick.insert(event.code);
+                        new_state.insert(KeyboardState::Active(event.code));
                         self.pressed_keys.insert(event.code);
                     }
                 }
@@ -52,8 +50,8 @@ impl KeyboardTracker {
             }
         }
 
-        for code in pressed_this_tick.iter().chain(still_active_keys.iter()) {
-            new_state.insert(KeyboardState::Active(*code));
+        for code in still_active_keys {
+            new_state.insert(KeyboardState::Active(code));
         }
 
         self.current_state = new_state;
@@ -63,7 +61,7 @@ impl KeyboardTracker {
 
 #[cfg(test)]
 mod tests {
-    use crossterm::event::{KeyEventKind, KeyEventState, KeyModifiers};
+    use crossterm::event::{KeyEventKind, KeyModifiers};
 
     use super::*;
 

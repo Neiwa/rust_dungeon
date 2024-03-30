@@ -1,4 +1,5 @@
 pub mod coord;
+pub mod keyboard_state;
 
 use crossterm::{event::KeyCode, style::Color};
 
@@ -7,6 +8,8 @@ use crate::{
     magic::Spell,
     AsCoord, AsDirection, Coord, Direction, Object, Player, Unit,
 };
+
+use self::keyboard_state::KeyboardState;
 
 pub trait ConsoleUnit {
     fn color(&self) -> Color;
@@ -130,6 +133,29 @@ impl AsCommand for KeyCode {
             KeyCode::Char('l') => Some(Command::Evoke(Direction::Right)),
             KeyCode::Char('o') => Some(Command::CycleSpell),
             _ => None,
+        }
+    }
+}
+
+impl AsCommand for KeyboardState {
+    fn as_command(&self) -> Option<Command> {
+        match self {
+            KeyboardState::Press(code) => match code {
+                KeyCode::Char('o') => Some(Command::CycleSpell),
+                _ => None,
+            },
+            KeyboardState::Release(_) => None,
+            KeyboardState::Active(code) => match code {
+                KeyCode::Up | KeyCode::Char('w') => Some(Command::Move(Direction::Up)),
+                KeyCode::Left | KeyCode::Char('a') => Some(Command::Move(Direction::Left)),
+                KeyCode::Down | KeyCode::Char('s') => Some(Command::Move(Direction::Down)),
+                KeyCode::Right | KeyCode::Char('d') => Some(Command::Move(Direction::Right)),
+                KeyCode::Char('i') => Some(Command::Evoke(Direction::Up)),
+                KeyCode::Char('j') => Some(Command::Evoke(Direction::Left)),
+                KeyCode::Char('k') => Some(Command::Evoke(Direction::Down)),
+                KeyCode::Char('l') => Some(Command::Evoke(Direction::Right)),
+                _ => None,
+            },
         }
     }
 }

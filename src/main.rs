@@ -1,4 +1,5 @@
 use command::{AsCommand, Command};
+use console::keyboard_state::KeyboardTracker;
 use console::{coord::AsDirection, loader};
 use console::{AsSymbol, ConsoleUnit};
 use crossterm::{
@@ -350,7 +351,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     let mut exit = false;
     let mut player_moved = false;
-    let mut input_tracker: Vec<KeyCode> = Vec::new();
+    let mut keyboard_tracker = KeyboardTracker::new();
 
     let mut events = Vec::new();
 
@@ -377,91 +378,20 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         if poll(Duration::from_millis(20))? {
             let event = read();
+
             match event {
-                Ok(Event::Key(KeyEvent { code, kind, .. })) => match kind {
-                    event::KeyEventKind::Press => {
-                        if code.as_command().is_some() {
-                            if !input_tracker.contains(&code) {
-                                input_tracker.push(code);
-                            }
-                        } else {
-                            match code {
-                                KeyCode::Esc => {
-                                    exit = true;
-                                }
-                                _ => {}
-                            }
+                Ok(Event::Key(key_event)) => {
+                    keyboard_tracker.register_event(key_event);
+                    match key_event {
+                        KeyEvent {
+                            code: KeyCode::Esc, ..
+                        } => {
+                            exit = true;
                         }
+                        _ => {}
                     }
-                    event::KeyEventKind::Release => {
-                        if code.as_command().is_some() {
-                            if input_tracker.contains(&code) {
-                                input_tracker.retain(|&d| d != code);
-                            }
-                        }
-                    }
-                    event::KeyEventKind::Repeat => {}
-                },
+                }
                 _ => {}
-            }
-            events.push((
-                elapsed,
-                unit_ticker,
-                format!("{:?} {:?}", event?, input_tracker),
-            ));
-        }
-
-        if input_tracker.len() > 0 {
-            let mut step = Point::new(0.0, 0.0);
-
-            for input in &input_tracker {
-                match input.as_command() {
-                    Some(Command::Move(direction)) => step += direction.as_point(),
-                    Some(Command::Evoke(direction)) => {
-                        if state.player.active_spell_can_evoke(unit_ticker) {
-                            let mut objects =
-                                state.player.active_spell_evoke(direction, unit_ticker);
-
-                            while let Some(object) = objects.pop() {
-                                render_actions.push_back(RenderAction::Create {
-                                    symbol: object.symbol(),
-                                    color: object.color(),
-                                    coord: object.location().as_coord(),
-                                });
-
-                                state.objects.push(object);
-                            }
-                        }
-                    }
-                    Some(Command::CycleSpell) => {
-                        state.player.active_spell =
-                            (state.player.active_spell + 1) % state.player.spells.len()
-                    }
-                    _ => {}
-                }
-            }
-
-            // Move
-            if !player_moved && step != Point::new(0.0, 0.0) {
-                let prev_pos = state.player.location.as_coord();
-                let next_pos = state.player.location + step.normalize(state.player.speed());
-                let next_coord = next_pos.as_coord();
-
-                if next_coord.x > 0
-                    && next_coord.x < cols - 2
-                    && next_coord.y > 0
-                    && next_coord.y < rows - 1
-                {
-                    state.player.step(next_pos);
-
-                    render_actions.push_back(RenderAction::Move {
-                        symbol: state.player.symbol(),
-                        color: state.player.color(),
-                        old: prev_pos,
-                        new: state.player.coord(),
-                    });
-                    player_moved = true;
-                }
             }
         }
 
@@ -520,6 +450,61 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
 
         if tick {
+            let keyboard_state = keyboard_tracker.calculate_state();
+
+            let mut step = Point::new(0.0, 0.0);
+
+            for key_state in keyboard_state {
+                match key_state.as_command() {
+                    Some(Command::Move(direction)) => {
+                        step += direction.as_point();
+                    }
+                    Some(Command::Evoke(direction)) => {
+                        if state.player.active_spell_can_evoke(unit_ticker) {
+                            let mut objects =
+                                state.player.active_spell_evoke(direction, unit_ticker);
+
+                            while let Some(object) = objects.pop() {
+                                render_actions.push_back(RenderAction::Create {
+                                    symbol: object.symbol(),
+                                    color: object.color(),
+                                    coord: object.location().as_coord(),
+                                });
+
+                                state.objects.push(object);
+                            }
+                        }
+                    }
+                    Some(Command::CycleSpell) => {
+                        state.player.active_spell =
+                            (state.player.active_spell + 1) % state.player.spells.len()
+                    }
+                    _ => {}
+                }
+            }
+
+            if step != Point::new(0.0, 0.0) {
+                let prev_pos = state.player.location.as_coord();
+                let next_pos = state.player.location + step.normalize(state.player.speed());
+                let next_coord = next_pos.as_coord();
+
+                if next_coord.x > 0
+                    && next_coord.x < cols - 2
+                    && next_coord.y > 0
+                    && next_coord.y < rows - 1
+                {
+                    state.player.step(next_pos);
+
+                    render_actions.push_back(RenderAction::Move {
+                        symbol: state.player.symbol(),
+                        color: state.player.color(),
+                        old: prev_pos,
+                        new: state.player.coord(),
+                    });
+                    player_moved = true;
+                }
+            }
+
             if !player_moved {
                 if state.player.energy < state.player.max_energy {
                     state.player.energy += 1;

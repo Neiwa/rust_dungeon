@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 
 use crossterm::event::{KeyCode, KeyEvent};
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone)]
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum KeyboardState {
     Press(KeyCode),
     Release(KeyCode),

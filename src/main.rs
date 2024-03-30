@@ -344,7 +344,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     let mut last_tick = 0;
     let mut tick = false;
-    let mut last_fireball_tick = 0;
+    let mut last_object_tick = 0;
     let mut object_tick = false;
     let mut last_spawn_tick = 0;
     let mut spawn_tick = true;
@@ -363,9 +363,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             tick = true;
             player_moved = false;
         }
-        let fireball_ticker = elapsed.as_millis() / 100;
-        if fireball_ticker > last_fireball_tick {
-            last_fireball_tick = fireball_ticker;
+        let object_ticker = elapsed.as_millis() / 100;
+        if object_ticker > last_object_tick {
+            last_object_tick = object_ticker;
             object_tick = true;
         }
         let spawn_ticker = elapsed.as_secs() / 5;

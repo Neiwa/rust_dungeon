@@ -1,6 +1,6 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub enum KeyboardState {
@@ -10,7 +10,7 @@ pub enum KeyboardState {
 }
 
 pub struct KeyboardTracker {
-    active_input: Vec<KeyCode>,
+    pressed_keys: HashSet<KeyCode>,
     current_events: VecDeque<KeyEvent>,
     current_state: HashSet<KeyboardState>,
 }
@@ -18,7 +18,7 @@ pub struct KeyboardTracker {
 impl KeyboardTracker {
     pub fn new() -> Self {
         Self {
-            active_input: Vec::new(),
+            pressed_keys: HashSet::new(),
             current_events: VecDeque::new(),
             current_state: HashSet::new(),
         }
@@ -30,34 +30,30 @@ impl KeyboardTracker {
 
     pub fn calculate_state(&mut self) -> &HashSet<KeyboardState> {
         let mut new_state = HashSet::new();
-
-        for state in &self.current_state {
-            match state {
-                KeyboardState::Active(code) => {
-                    if !self.current_state.contains(&KeyboardState::Release(*code)) {
-                        new_state.insert(*state);
-                    }
-                }
-                _ => {}
-            }
-        }
+        let mut pressed_this_tick: HashSet<KeyCode> = HashSet::new();
+        let mut still_active_keys = self.pressed_keys.clone();
 
         while let Some(event) = self.current_events.pop_front() {
             match event.kind {
                 crossterm::event::KeyEventKind::Press => {
-                    if !new_state.contains(&KeyboardState::Active(event.code)) {
+                    if !self.pressed_keys.contains(&event.code) {
                         new_state.insert(KeyboardState::Press(event.code));
-                        new_state.insert(KeyboardState::Active(event.code));
+
+                        pressed_this_tick.insert(event.code);
+                        self.pressed_keys.insert(event.code);
                     }
                 }
                 crossterm::event::KeyEventKind::Release => {
-                    if !new_state.contains(&KeyboardState::Press(event.code)) {
-                        new_state.remove(&KeyboardState::Active(event.code));
-                    }
                     new_state.insert(KeyboardState::Release(event.code));
+                    self.pressed_keys.remove(&event.code);
+                    still_active_keys.remove(&event.code);
                 }
                 crossterm::event::KeyEventKind::Repeat => todo!(),
             }
+        }
+
+        for code in pressed_this_tick.iter().chain(still_active_keys.iter()) {
+            new_state.insert(KeyboardState::Active(*code));
         }
 
         self.current_state = new_state;
@@ -309,5 +305,47 @@ mod tests {
         // Assert
         assert_eq!(state.len(), 1);
         assert!(state.contains(&KeyboardState::Active(code)));
+    }
+
+    #[test]
+    fn test_case_7() {
+        // Assign
+        let mut tracker = KeyboardTracker::new();
+        let code = KeyCode::Char('b');
+        let press = KeyEvent::new_with_kind(
+            KeyCode::Char('b'),
+            KeyModifiers::empty(),
+            KeyEventKind::Press,
+        );
+        let release = KeyEvent::new_with_kind(
+            KeyCode::Char('b'),
+            KeyModifiers::empty(),
+            KeyEventKind::Release,
+        );
+
+        // Act
+        tracker.register_event(press);
+        let state = tracker.calculate_state();
+
+        // Assert
+        assert_eq!(state.len(), 2);
+        assert!(state.contains(&KeyboardState::Press(code)));
+        assert!(state.contains(&KeyboardState::Active(code)));
+
+        // Act
+        tracker.register_event(press);
+        let state = tracker.calculate_state();
+
+        // Assert
+        assert_eq!(state.len(), 1);
+        assert!(state.contains(&KeyboardState::Active(code)));
+
+        // Act
+        tracker.register_event(release);
+        let state = tracker.calculate_state();
+
+        // Assert
+        assert_eq!(state.len(), 1);
+        assert!(state.contains(&KeyboardState::Release(code)));
     }
 }

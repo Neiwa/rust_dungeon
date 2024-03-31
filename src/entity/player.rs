@@ -2,7 +2,7 @@ use crate::{
     magic::{fireball::FireballMagic, inferno::InfernoMagic, sphere::SphereMagic, Magic},
     object::Object,
     point::Point,
-    Coord, Direction, UnitLogic,
+    Coord, Direction, Entity, Unit,
 };
 
 pub struct Player {
@@ -49,12 +49,17 @@ impl Player {
     }
 }
 
-impl UnitLogic for Player {
+impl Unit for Player {
     fn step(&mut self, step: Point) {
         self.location = step;
     }
 
     fn speed(&self) -> f64 {
         1.0
+    }
+}
+impl Entity for Player {
+    fn location(&self) -> Point {
+        self.location
     }
 }

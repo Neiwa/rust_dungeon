@@ -214,9 +214,13 @@ where
         if !skip_clear.contains(&coord) {
             queue!(
                 stdout,
-                cursor::MoveTo((2 * coord.x - 1) as u16, coord.y as u16),
-                style::PrintStyledContent(' '.on(bg_color(Coord::new(coord.x * 2 - 1, coord.y)))),
-                style::PrintStyledContent(' '.on(bg_color(Coord::new(coord.x * 2, coord.y)))),
+                cursor::MoveTo((2 * coord.x + 1) as u16, (coord.y + 1) as u16),
+                style::PrintStyledContent(
+                    ' '.on(bg_color(Coord::new(coord.x * 2 + 1, coord.y + 1)))
+                ),
+                style::PrintStyledContent(
+                    ' '.on(bg_color(Coord::new(coord.x * 2 + 2, coord.y + 1)))
+                ),
             )?;
         }
     }
@@ -225,7 +229,7 @@ where
         match render {
             (coord, symbol, color) => queue!(
                 stdout,
-                cursor::MoveTo((2 * coord.x - 1) as u16, coord.y as u16),
+                cursor::MoveTo((2 * coord.x + 1) as u16, (coord.y + 1) as u16),
                 style::PrintStyledContent(symbol.with(color).on(bg_color(coord))),
             )?,
         }
@@ -236,8 +240,8 @@ where
 
 fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let (t_cols, t_rows) = size()?;
-    let cols = ((t_cols / 2) as i32).clamp(0, 30);
-    let rows = (t_rows as i32).clamp(0, 30);
+    let cols = (((t_cols - 2) / 2) as i32).clamp(0, 30);
+    let rows = ((t_rows - 2) as i32).clamp(0, 30);
 
     let mut state = State {
         start: Instant::now(),
@@ -288,7 +292,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             (
                 "spells",
                 Indicator {
-                    coord: Coord::new(5, rows as i32 - 1),
+                    coord: Coord::new(5, rows as i32 + 1),
                     color: Color::White,
                     bg_color: Color::Magenta,
                 },
@@ -296,7 +300,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             (
                 "energy",
                 Indicator {
-                    coord: Coord::new((2 * cols - 10).into(), rows as i32 - 1),
+                    coord: Coord::new((2 * cols - 10).into(), rows as i32 + 1),
                     color: Color::White,
                     bg_color: Color::Magenta,
                 },
@@ -305,18 +309,18 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     };
 
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
-    for y in 0..rows {
-        for x in 0..2 * cols - 2 {
+    for y in 0..rows + 2 {
+        for x in 0..2 * cols + 2 {
             let content = match (x, y) {
                 (0, 0) => "╔".magenta(),
-                (0, y) if y == rows - 1 => "╚═".magenta(),
-                (x, 0) if x == 2 * cols - 3 => "╗".magenta(),
-                (x, y) if x == 2 * cols - 3 && y == rows - 1 => "╝".magenta(),
+                (0, y) if y == rows + 1 => "╚".magenta(),
+                (x, 0) if x == 2 * cols + 1 => "╗".magenta(),
+                (x, y) if x == 2 * cols + 1 && y == rows + 1 => "╝".magenta(),
                 (0, _) => "║".magenta(),
-                (x, _) if x == 2 * cols - 3 => "║".magenta(),
+                (x, _) if x == 2 * cols + 1 => "║".magenta(),
                 (_, 0) => "═".magenta(),
-                (_, y) if y == rows - 1 => "═".magenta(),
-                _ => " ".on(bg_color(Coord::new(2 * x - 1, y))),
+                (_, y) if y == rows + 1 => "═".magenta(),
+                _ => " ".on(bg_color(Coord::new(2 * x + 1, y + 1))),
             };
 
             queue!(
@@ -425,10 +429,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 let new_pos = object.location() + object.vector();
 
                 let next_coord = new_pos.as_coord();
-                if next_coord.x > 0
-                    && next_coord.x < cols - 1
-                    && next_coord.y > 0
-                    && next_coord.y < rows - 1
+                if next_coord.x >= 0
+                    && next_coord.x < cols
+                    && next_coord.y >= 0
+                    && next_coord.y < rows
                 {
                     let mut hit = false;
 
@@ -488,10 +492,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                             while let Some(object) = objects.pop() {
                                 let object_coord = object.location().as_coord();
 
-                                if object_coord.x > 0
-                                    && object_coord.x < cols - 1
-                                    && object_coord.y > 0
-                                    && object_coord.y < rows - 1
+                                if object_coord.x >= 0
+                                    && object_coord.x < cols
+                                    && object_coord.y >= 0
+                                    && object_coord.y < rows
                                 {
                                     render_actions.push_back(RenderAction::Create {
                                         symbol: object.symbol(),
@@ -527,10 +531,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 let next_pos = state.player.location + step.normalize(state.player.speed());
                 let next_coord = next_pos.as_coord();
 
-                if next_coord.x > 0
-                    && next_coord.x < cols - 1
-                    && next_coord.y > 0
-                    && next_coord.y < rows - 1
+                if next_coord.x >= 0
+                    && next_coord.x < cols
+                    && next_coord.y >= 0
+                    && next_coord.y < rows
                 {
                     state.player.step(next_pos);
 
@@ -558,10 +562,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 let new_pos = monster.seek(state.player.location, unit_ticker);
                 let next_coord = new_pos.as_coord();
 
-                if next_coord.x > 0
-                    && next_coord.x < cols - 1
-                    && next_coord.y > 0
-                    && next_coord.y < rows - 1
+                if next_coord.x >= 0
+                    && next_coord.x < cols
+                    && next_coord.y >= 0
+                    && next_coord.y < rows
                 {
                     let mut collision = false;
 
@@ -611,6 +615,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
 
         if tick || spawn_tick || object_tick || render_actions.len() > 0 {
+            execute!(stdout, terminal::BeginSynchronizedUpdate)?;
+
             queue_actions_draw(stdout, render_actions.into_iter())?;
 
             queue_value_draw(
@@ -639,6 +645,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             )?;
 
             stdout.flush()?;
+            execute!(stdout, terminal::EndSynchronizedUpdate)?;
         }
         tick = false;
         spawn_tick = false;

@@ -46,12 +46,18 @@ impl Monster {
     }
 }
 
-impl UnitLogic for Monster {
+impl Unit for Monster {
     fn step(&mut self, step: Point) {
         self.location = step;
     }
 
     fn speed(&self) -> f64 {
         self.speed
+    }
+}
+
+impl Entity for Monster {
+    fn location(&self) -> Point {
+        self.location
     }
 }

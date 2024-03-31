@@ -10,6 +10,9 @@ use crossterm::{
     terminal::{self, size, SetSize},
 };
 
+use entity::monster::Monster;
+use entity::object::Object;
+use entity::player::Player;
 use point::{AsPoint, Point};
 use render_action::RenderAction;
 
@@ -24,17 +27,17 @@ use std::{
 
 mod command;
 mod console;
+mod entity;
 mod magic;
 pub mod point;
 mod render_action;
-mod unit;
 use crate::console::{coord::*, loader_reverse, AsColor};
-use crate::unit::*;
+use crate::entity::*;
 
 struct State {
     score: i32,
     start: Instant,
-    monsters: Vec<unit::Unit>,
+    monsters: Vec<Monster>,
     player: Player,
     objects: Vec<Box<dyn Object>>,
 }
@@ -241,13 +244,13 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         score: 0,
         player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2)),
         monsters: vec![
-            Unit::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
-            Unit::new(
+            Monster::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
+            Monster::new(
                 Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
                 Some(40),
                 Some(0.7),
             ),
-            Unit::new(
+            Monster::new(
                 Coord::new(
                     cols as i32 / 4 + cols as i32 / 2,
                     rows as i32 / 4 + rows as i32 / 2,
@@ -255,7 +258,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 Some(500),
                 None,
             ),
-            Unit::new(
+            Monster::new(
                 Coord::new(cols as i32 / 4, rows as i32 / 4 + rows as i32 / 2),
                 Some(200),
                 None,
@@ -595,7 +598,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         if spawn_tick {
             if state.monsters.len() < 3 {
-                let monster = Unit::new(Coord::new(4, 4), None, None);
+                let monster = Monster::new(Coord::new(4, 4), None, None);
 
                 render_actions.push_back(RenderAction::Create {
                     symbol: monster.symbol(),

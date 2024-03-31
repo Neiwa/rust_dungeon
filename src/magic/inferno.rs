@@ -1,7 +1,7 @@
 use crate::{
     magic::fireball::FireballObject,
     point::{AsPoint, Point},
-    Direction,
+    Direction, Object,
 };
 
 use super::{Magic, Spell};
@@ -30,7 +30,7 @@ impl Magic for InfernoMagic {
         location: Point,
         _direction: Direction,
         ticker: u128,
-    ) -> Vec<Box<dyn crate::Object>> {
+    ) -> Vec<Box<dyn Object>> {
         self.last_evoke = Some(ticker);
 
         vec![

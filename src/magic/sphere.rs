@@ -38,7 +38,7 @@ impl Object for SphereObject {
         self.location = location
     }
 
-    fn get_spell(&self) -> crate::magic::Spell {
+    fn get_spell(&self) -> Spell {
         Spell::Sphere
     }
 }

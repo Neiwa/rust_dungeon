@@ -1,4 +1,4 @@
-use crate::{point::Point, Direction, Object};
+use crate::{object::Object, point::Point, Direction};
 
 pub mod fireball;
 pub mod inferno;

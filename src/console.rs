@@ -6,7 +6,10 @@ use crossterm::{event::KeyCode, style::Color};
 use crate::{
     command::{AsCommand, Command},
     magic::Spell,
-    AsCoord, AsDirection, Coord, Direction, Object, Player, Unit,
+    monster::Monster,
+    object::Object,
+    player::Player,
+    AsCoord, AsDirection, Coord, Direction,
 };
 
 use self::keyboard_state::KeyboardState;
@@ -40,7 +43,7 @@ const SYMBOLS: [char; 84] = [
     '🧞', '🧟', '🧌', '🫏',
 ];
 
-impl ConsoleUnit for Unit {
+impl ConsoleUnit for Monster {
     fn color(&self) -> Color {
         match self.id % 11 {
             0 => Color::Grey,

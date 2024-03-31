@@ -9,14 +9,16 @@ pub struct FireballObject {
     pub location: Point,
     pub vector: Point,
     pub speed: f64,
+    last_tick: u128,
 }
 
 impl FireballObject {
-    pub fn new(location: Point, vector: Point) -> Self {
+    pub fn new(location: Point, vector: Point, ticker: u128) -> Self {
         Self {
             location,
-            vector: vector.normalize(0.8),
-            speed: 0.8,
+            vector: vector.normalize(0.01),
+            speed: 0.01,
+            last_tick: ticker,
         }
     }
 }
@@ -34,12 +36,17 @@ impl Object for FireballObject {
         self.speed
     }
 
-    fn set_location(&mut self, location: Point) {
-        self.location = location
+    fn set_location(&mut self, location: Point, ticker: u128) {
+        self.location = location;
+        self.last_tick = ticker;
     }
 
     fn get_spell(&self) -> Spell {
         Spell::Fireball
+    }
+
+    fn next_location(&self, ticker: u128) -> Point {
+        self.location + self.vector * (ticker - self.last_tick)
     }
 }
 
@@ -69,6 +76,7 @@ impl Magic for FireballMagic {
         vec![Box::new(FireballObject::new(
             location + direction.normalize(1.0),
             direction,
+            ticker,
         ))]
     }
 

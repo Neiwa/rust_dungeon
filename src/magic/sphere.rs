@@ -9,14 +9,16 @@ pub struct SphereObject {
     pub location: Point,
     pub vector: Point,
     pub speed: f64,
+    last_tick: u128,
 }
 
 impl SphereObject {
-    pub fn new(location: Point, direction: Point) -> Self {
+    pub fn new(location: Point, direction: Point, ticker: u128) -> Self {
         Self {
             location,
-            vector: direction.normalize(0.5),
-            speed: 0.5,
+            vector: direction.normalize(0.005),
+            speed: 0.005,
+            last_tick: ticker,
         }
     }
 }
@@ -34,12 +36,17 @@ impl Object for SphereObject {
         self.speed
     }
 
-    fn set_location(&mut self, location: Point) {
-        self.location = location
+    fn set_location(&mut self, location: Point, ticker: u128) {
+        self.location = location;
+        self.last_tick = ticker;
     }
 
     fn get_spell(&self) -> Spell {
         Spell::Sphere
+    }
+
+    fn next_location(&self, ticker: u128) -> Point {
+        self.location + self.vector * (ticker - self.last_tick)
     }
 }
 
@@ -69,6 +76,7 @@ impl Magic for SphereMagic {
         vec![Box::new(SphereObject::new(
             location + direction.normalize(1.0),
             direction,
+            ticker,
         ))]
     }
 

@@ -161,7 +161,9 @@ fn queue_spells_draw(
                 format!(
                     "{}",
                     loader_reverse(
-                        spell.cooldown() - spell.remaining_cooldown(ticker),
+                        spell
+                            .cooldown()
+                            .saturating_sub(spell.remaining_cooldown(ticker)),
                         spell.cooldown(),
                         spell.cooldown()
                     ),
@@ -370,8 +372,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     let mut last_tick = 0;
     let mut tick = false;
-    let mut last_object_tick = 0;
-    let mut object_tick = false;
     let mut last_spawn_tick = 0;
     let mut spawn_tick = true;
 
@@ -384,26 +384,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut mouse_coord = Coord::new(0, 0);
 
     loop {
-        let elapsed = state.start.elapsed();
-        let unit_ticker = elapsed.as_millis() / 200;
-        if unit_ticker > last_tick {
-            last_tick = unit_ticker;
-            tick = true;
-            player_moved = false;
-        }
-        let object_ticker = elapsed.as_millis() / 100;
-        if object_ticker > last_object_tick {
-            last_object_tick = object_ticker;
-            object_tick = true;
-        }
-        let spawn_ticker = elapsed.as_secs() / 5;
-        if spawn_ticker > last_spawn_tick {
-            last_spawn_tick = spawn_ticker;
-            spawn_tick = true;
-        }
-
-        let mut render_actions: VecDeque<RenderAction> = VecDeque::new();
-
         if poll(Duration::from_millis(20))? {
             let event = read();
 
@@ -422,7 +402,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 Ok(Event::Mouse(MouseEvent {
                     column, row, kind, ..
                 })) => {
-                    mouse_coord = Coord::new(((column - 1) / 2).into(), (row - 1).into());
+                    mouse_coord = Coord::new(
+                        (column.saturating_sub(1) / 2).into(),
+                        row.saturating_sub(1).into(),
+                    );
 
                     match kind {
                         event::MouseEventKind::Down(MouseButton::Left) => keyboard_tracker
@@ -437,16 +420,34 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 _ => {}
             }
         }
+        let elapsed = state.start.elapsed();
+        let ticker = elapsed.as_millis();
 
-        if object_tick {
-            let object_len = state.objects.len();
+        let unit_ticker = elapsed.as_millis() / 200;
+        if unit_ticker > last_tick {
+            last_tick = unit_ticker;
+            tick = true;
+            player_moved = false;
+        }
+        let spawn_ticker = elapsed.as_secs() / 5;
+        if spawn_ticker > last_spawn_tick {
+            last_spawn_tick = spawn_ticker;
+            spawn_tick = true;
+        }
 
-            for object_ix in (0..object_len).rev() {
+        let mut render_actions: VecDeque<RenderAction> = VecDeque::new();
+
+        let object_len = state.objects.len();
+
+        for object_ix in (0..object_len).rev() {
+            let object = &state.objects[object_ix];
+            let prev_coord = object.location().as_coord();
+            let new_pos = object.next_location(ticker);
+
+            let next_coord = new_pos.as_coord();
+
+            if prev_coord != next_coord {
                 let mut object = state.objects.remove(object_ix);
-                let prev_coord = object.location().as_coord();
-                let new_pos = object.location() + object.vector();
-
-                let next_coord = new_pos.as_coord();
                 if next_coord.x >= 0
                     && next_coord.x < cols
                     && next_coord.y >= 0
@@ -455,7 +456,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     let mut hit = false;
 
                     for monster_ix in 0..state.monsters.len() {
-                        if state.monsters[monster_ix].coord() == new_pos.as_coord() {
+                        if state.monsters[monster_ix].coord() == next_coord {
                             state.score += 1;
 
                             let monster = state.monsters.remove(monster_ix);
@@ -473,7 +474,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     }
 
                     if !hit {
-                        object.set_location(new_pos);
+                        object.set_location(new_pos, ticker);
 
                         render_actions.push_back(RenderAction::Move {
                             symbol: object.symbol(),
@@ -503,10 +504,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         step = step + direction.as_point();
                     }
                     Some(Command::Evoke(direction)) => {
-                        if state.player.active_spell_can_evoke(unit_ticker) {
+                        if state.player.active_spell_can_evoke(ticker) {
                             let mut objects = state
                                 .player
-                                .active_spell_evoke(direction.as_point(), unit_ticker);
+                                .active_spell_evoke(direction.as_point(), ticker);
 
                             while let Some(object) = objects.pop() {
                                 let object_coord = object.location().as_coord();
@@ -528,10 +529,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         }
                     }
                     Some(Command::EvokeMouse) => {
-                        if state.player.active_spell_can_evoke(unit_ticker) {
+                        if state.player.active_spell_can_evoke(ticker) {
                             let mut objects = state.player.active_spell_evoke(
                                 (mouse_coord.as_point() - state.player.location).normalize(1.0),
-                                unit_ticker,
+                                ticker,
                             );
 
                             while let Some(object) = objects.pop() {
@@ -659,7 +660,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             }
         }
 
-        if tick || spawn_tick || object_tick || render_actions.len() > 0 {
+        if tick || spawn_tick || render_actions.len() > 0 {
             execute!(stdout, terminal::BeginSynchronizedUpdate)?;
 
             queue_actions_draw(stdout, render_actions.into_iter())?;
@@ -694,7 +695,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
         tick = false;
         spawn_tick = false;
-        object_tick = false;
 
         if state.player.coord() == Coord::new(1, 1) || exit {
             break;

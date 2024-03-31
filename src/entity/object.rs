@@ -4,8 +4,9 @@ pub trait Object {
     fn location(&self) -> Point;
     fn vector(&self) -> Point;
     fn speed(&self) -> f64;
-    fn set_location(&mut self, location: Point);
+    fn set_location(&mut self, location: Point, ticker: u128);
     fn get_spell(&self) -> Spell;
+    fn next_location(&self, ticker: u128) -> Point;
 }
 
 impl<T: Object> Entity for T {

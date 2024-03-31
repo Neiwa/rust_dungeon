@@ -32,98 +32,122 @@ impl Magic for InfernoMagic {
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point() + Direction::Left.as_point(),
                 Direction::Up.as_point() + Direction::Left.as_point() * 2,
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point() + Direction::Left.as_point(),
                 Direction::Up.as_point() + Direction::Left.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point() + Direction::Left.as_point(),
                 Direction::Up.as_point() * 2 + Direction::Left.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point(),
                 Direction::Up.as_point() * 2 + Direction::Left.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point(),
                 Direction::Up.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point(),
                 Direction::Up.as_point() * 2 + Direction::Right.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point() + Direction::Right.as_point(),
                 Direction::Up.as_point() * 2 + Direction::Right.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point() + Direction::Right.as_point(),
                 Direction::Up.as_point() + Direction::Right.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_point() + Direction::Right.as_point(),
                 Direction::Up.as_point() + Direction::Right.as_point() * 2,
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Right.as_point(),
                 Direction::Right.as_point() * 2 + Direction::Up.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Right.as_point(),
                 Direction::Right.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Right.as_point(),
                 Direction::Right.as_point() * 2 + Direction::Down.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point() + Direction::Right.as_point(),
                 Direction::Down.as_point() + Direction::Right.as_point() * 2,
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point() + Direction::Right.as_point(),
                 Direction::Down.as_point() + Direction::Right.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point() + Direction::Right.as_point(),
                 Direction::Down.as_point() * 2 + Direction::Right.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point(),
                 Direction::Down.as_point() * 2 + Direction::Right.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point(),
                 Direction::Down.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point(),
                 Direction::Down.as_point() * 2 + Direction::Left.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point() + Direction::Left.as_point(),
                 Direction::Down.as_point() * 2 + Direction::Left.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point() + Direction::Left.as_point(),
                 Direction::Down.as_point() + Direction::Left.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_point() + Direction::Left.as_point(),
                 Direction::Down.as_point() + Direction::Left.as_point() * 2,
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Left.as_point(),
                 Direction::Left.as_point() * 2 + Direction::Down.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Left.as_point(),
                 Direction::Left.as_point(),
+                ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Left.as_point(),
                 Direction::Left.as_point() * 2 + Direction::Up.as_point(),
+                ticker,
             )),
         ]
     }

@@ -94,6 +94,14 @@ impl ops::Mul<f64> for Point {
     }
 }
 
+impl ops::Mul<u128> for Point {
+    type Output = Self;
+
+    fn mul(self, rhs: u128) -> Self::Output {
+        Self::new(self.x * rhs as f64, self.y * rhs as f64)
+    }
+}
+
 impl ops::Sub<Point> for Point {
     type Output = Self;
 

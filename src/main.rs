@@ -2,6 +2,7 @@ use command::{AsCommand, Command};
 use console::coord::AsDirection;
 use console::keyboard_state::KeyboardTracker;
 use console::{AsSymbol, ConsoleUnit};
+use crossterm::event::{KeyModifiers, MouseButton, MouseEvent};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -74,7 +75,7 @@ fn main() -> io::Result<()> {
         stdout,
         terminal::EnterAlternateScreen,
         event::EnableMouseCapture,
-        cursor::Hide
+        cursor::Hide,
     )?;
     let score = game(&mut stdout);
     execute!(
@@ -380,6 +381,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     let mut events = Vec::new();
 
+    let mut mouse_coord = Coord::new(0, 0);
+
     loop {
         let elapsed = state.start.elapsed();
         let unit_ticker = elapsed.as_millis() / 200;
@@ -415,6 +418,21 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         }
                         _ => {}
                     }
+                }
+                Ok(Event::Mouse(MouseEvent {
+                    column, row, kind, ..
+                })) => {
+                    mouse_coord = Coord::new(((column - 1) / 2).into(), (row - 1).into());
+
+                    match kind {
+                        event::MouseEventKind::Down(MouseButton::Left) => keyboard_tracker
+                            .register_event(KeyEvent::new_with_kind(
+                                KeyCode::Char('m'),
+                                KeyModifiers::empty(),
+                                event::KeyEventKind::Release,
+                            )),
+                        _ => {}
+                    };
                 }
                 _ => {}
             }
@@ -477,17 +495,44 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         if tick {
             let keyboard_state = keyboard_tracker.calculate_state();
 
-            let mut step = Point::new(0.0, 0.0);
+            let mut step: Option<Point> = None;
 
             for key_state in keyboard_state {
                 match key_state.as_command() {
                     Some(Command::Move(direction)) => {
-                        step += direction.as_point();
+                        step = step + direction.as_point();
                     }
                     Some(Command::Evoke(direction)) => {
                         if state.player.active_spell_can_evoke(unit_ticker) {
-                            let mut objects =
-                                state.player.active_spell_evoke(direction, unit_ticker);
+                            let mut objects = state
+                                .player
+                                .active_spell_evoke(direction.as_point(), unit_ticker);
+
+                            while let Some(object) = objects.pop() {
+                                let object_coord = object.location().as_coord();
+
+                                if object_coord.x >= 0
+                                    && object_coord.x < cols
+                                    && object_coord.y >= 0
+                                    && object_coord.y < rows
+                                {
+                                    render_actions.push_back(RenderAction::Create {
+                                        symbol: object.symbol(),
+                                        color: object.color(),
+                                        coord: object_coord,
+                                    });
+
+                                    state.objects.push(object);
+                                }
+                            }
+                        }
+                    }
+                    Some(Command::EvokeMouse) => {
+                        if state.player.active_spell_can_evoke(unit_ticker) {
+                            let mut objects = state.player.active_spell_evoke(
+                                (mouse_coord.as_point() - state.player.location).normalize(1.0),
+                                unit_ticker,
+                            );
 
                             while let Some(object) = objects.pop() {
                                 let object_coord = object.location().as_coord();
@@ -526,9 +571,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 }
             }
 
-            if step != Point::new(0.0, 0.0) {
+            if let Some(vec) = step {
                 let prev_pos = state.player.location.as_coord();
-                let next_pos = state.player.location + step.normalize(state.player.speed());
+                let next_pos = state.player.location + vec.normalize(state.player.speed());
                 let next_coord = next_pos.as_coord();
 
                 if next_coord.x >= 0

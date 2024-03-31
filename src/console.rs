@@ -144,8 +144,8 @@ impl AsCommand for KeyboardState {
     fn as_command(&self) -> Option<Command> {
         match self {
             KeyboardState::Press(code) => match code {
-                KeyCode::Char('u') => Some(Command::CycleSpell(false)),
-                KeyCode::Char('o') => Some(Command::CycleSpell(true)),
+                KeyCode::Char('u') | KeyCode::Char('q') => Some(Command::CycleSpell(false)),
+                KeyCode::Char('o') | KeyCode::Char('e') => Some(Command::CycleSpell(true)),
                 KeyCode::Char('1') => Some(Command::SelectSpell(0)),
                 KeyCode::Char('2') => Some(Command::SelectSpell(1)),
                 KeyCode::Char('3') => Some(Command::SelectSpell(2)),
@@ -157,7 +157,10 @@ impl AsCommand for KeyboardState {
                 KeyCode::Char('9') => Some(Command::SelectSpell(8)),
                 _ => None,
             },
-            KeyboardState::Release(_) => None,
+            KeyboardState::Release(code) => match code {
+                KeyCode::Char('m') => Some(Command::EvokeMouse),
+                _ => None,
+            },
             KeyboardState::Active(code) => match code {
                 KeyCode::Up | KeyCode::Char('w') => Some(Command::Move(Direction::Up)),
                 KeyCode::Left | KeyCode::Char('a') => Some(Command::Move(Direction::Left)),
@@ -175,6 +178,7 @@ impl AsCommand for KeyboardState {
 
 const LOADING_SYMBOLS: [char; 9] = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
+#[allow(dead_code)]
 pub fn loader(current: u128, target: u128, range: u128) -> char {
     let val = ((range.saturating_sub(target.saturating_sub(current))) as f32 / range as f32
         * LOADING_SYMBOLS.len() as f32)

@@ -28,10 +28,7 @@ impl Monster {
     }
     pub fn seek(&self, seek_point: Point, _elapsed: u128) -> Point {
         let step = match rand::random::<usize>() % self.logic {
-            ..=39 => Point::new(
-                seek_point.x - self.location.x,
-                seek_point.y - self.location.y,
-            ),
+            ..=39 => seek_point - self.location,
             ..=59 => Point::new(seek_point.x - self.location.x, 0.0),
             ..=79 => Point::new(0.0, seek_point.y - self.location.y),
             ..=84 => Direction::Right.as_point(),

@@ -2,7 +2,7 @@ use crate::{
     magic::{fireball::FireballMagic, inferno::InfernoMagic, sphere::SphereMagic, Magic},
     object::Object,
     point::Point,
-    Coord, Direction, Entity, Unit,
+    Coord, Entity, Unit,
 };
 
 pub struct Player {
@@ -29,15 +29,12 @@ impl Player {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_active_spell(&self) -> &Box<dyn Magic> {
         self.spells.get(self.active_spell).unwrap()
     }
 
-    pub fn active_spell_evoke(
-        &mut self,
-        direction: Direction,
-        ticker: u128,
-    ) -> Vec<Box<dyn Object>> {
+    pub fn active_spell_evoke(&mut self, direction: Point, ticker: u128) -> Vec<Box<dyn Object>> {
         let spell = &mut self.spells[self.active_spell];
         self.energy -= spell.cost();
         spell.evoke(self.location, direction, ticker)

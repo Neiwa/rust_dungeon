@@ -1,7 +1,7 @@
 use crate::{
     magic::{Magic, Spell},
-    point::{AsPoint, Point},
-    Direction, Object,
+    point::Point,
+    Object,
 };
 
 #[derive(Debug)]
@@ -63,17 +63,12 @@ impl Magic for FireballMagic {
         4
     }
 
-    fn evoke(
-        &mut self,
-        location: Point,
-        direction: Direction,
-        ticker: u128,
-    ) -> Vec<Box<dyn Object>> {
+    fn evoke(&mut self, location: Point, direction: Point, ticker: u128) -> Vec<Box<dyn Object>> {
         self.last_evoke = Some(ticker);
 
         vec![Box::new(FireballObject::new(
-            location + direction.as_point(),
-            direction.as_point(),
+            location + direction.normalize(1.0),
+            direction,
         ))]
     }
 

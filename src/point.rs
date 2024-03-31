@@ -34,10 +34,41 @@ impl ops::Add<Point> for Point {
     }
 }
 
+impl ops::Add<Option<Point>> for Point {
+    type Output = Self;
+
+    fn add(self, rhs: Option<Point>) -> Self::Output {
+        if let Some(r) = rhs {
+            return self + r;
+        }
+        self
+    }
+}
+
+impl ops::Add<Point> for Option<Point> {
+    type Output = Self;
+
+    fn add(self, rhs: Point) -> Self::Output {
+        if let Some(lhs) = self {
+            return Some(lhs + rhs);
+        }
+        Some(rhs)
+    }
+}
+
 impl ops::AddAssign<Point> for Point {
     fn add_assign(&mut self, rhs: Point) {
         self.x += rhs.x;
         self.y += rhs.y;
+    }
+}
+
+impl ops::AddAssign<Option<Point>> for Point {
+    fn add_assign(&mut self, rhs: Option<Point>) {
+        if let Some(r) = rhs {
+            self.x += r.x;
+            self.y += r.y;
+        }
     }
 }
 
@@ -60,6 +91,25 @@ impl ops::Mul<f64> for Point {
             x: self.x * rhs,
             y: self.y * rhs,
         }
+    }
+}
+
+impl ops::Sub<Point> for Point {
+    type Output = Self;
+
+    fn sub(self, rhs: Point) -> Self::Output {
+        Self::new(self.x - rhs.x, self.y - rhs.y)
+    }
+}
+
+impl ops::Sub<Option<Point>> for Point {
+    type Output = Self;
+
+    fn sub(self, rhs: Option<Point>) -> Self::Output {
+        if let Some(r) = rhs {
+            return self - r;
+        }
+        self
     }
 }
 

@@ -3,6 +3,7 @@ use crate::Direction;
 pub enum Command {
     Move(Direction),
     Evoke(Direction),
+    EvokeMouse,
     CycleSpell(bool),
     SelectSpell(usize),
 }

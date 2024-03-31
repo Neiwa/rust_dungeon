@@ -1,7 +1,7 @@
 use crate::{
     magic::{Magic, Spell},
-    point::{AsPoint, Point},
-    Direction, Object,
+    point::Point,
+    Object,
 };
 
 #[derive(Debug)]
@@ -12,10 +12,10 @@ pub struct SphereObject {
 }
 
 impl SphereObject {
-    pub fn new(location: Point, direction: Direction) -> Self {
+    pub fn new(location: Point, direction: Point) -> Self {
         Self {
             location,
-            vector: direction.as_point().normalize(0.5),
+            vector: direction.normalize(0.5),
             speed: 0.5,
         }
     }
@@ -63,16 +63,11 @@ impl Magic for SphereMagic {
         2
     }
 
-    fn evoke(
-        &mut self,
-        location: Point,
-        direction: Direction,
-        ticker: u128,
-    ) -> Vec<Box<dyn Object>> {
+    fn evoke(&mut self, location: Point, direction: Point, ticker: u128) -> Vec<Box<dyn Object>> {
         self.last_evoke = Some(ticker);
 
         vec![Box::new(SphereObject::new(
-            location + direction.as_point(),
+            location + direction.normalize(1.0),
             direction,
         ))]
     }

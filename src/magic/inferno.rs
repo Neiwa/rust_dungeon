@@ -25,12 +25,7 @@ impl Magic for InfernoMagic {
         200
     }
 
-    fn evoke(
-        &mut self,
-        location: Point,
-        _direction: Direction,
-        ticker: u128,
-    ) -> Vec<Box<dyn Object>> {
+    fn evoke(&mut self, location: Point, _direction: Point, ticker: u128) -> Vec<Box<dyn Object>> {
         self.last_evoke = Some(ticker);
 
         vec![

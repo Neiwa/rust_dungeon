@@ -46,7 +46,7 @@ impl Object for FireballObject {
     }
 
     fn next_location(&self, ticker: u128) -> Point {
-        self.location + self.vector * (ticker - self.last_tick)
+        self.location + self.vector * ticker.saturating_sub(self.last_tick)
     }
 }
 
@@ -67,7 +67,7 @@ impl Magic for FireballMagic {
     }
 
     fn cooldown(&self) -> u128 {
-        4
+        800
     }
 
     fn evoke(&mut self, location: Point, direction: Point, ticker: u128) -> Vec<Box<dyn Object>> {

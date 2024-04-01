@@ -249,24 +249,27 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut state = State {
         start: Instant::now(),
         score: 0,
-        player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2)),
+        player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2), 0),
         monsters: vec![
-            Monster::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4)),
+            Monster::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4), 0),
             Monster::new(
                 Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
+                0,
                 Some(40),
-                Some(0.7),
+                Some(0.003),
             ),
             Monster::new(
                 Coord::new(
                     cols as i32 / 4 + cols as i32 / 2,
                     rows as i32 / 4 + rows as i32 / 2,
                 ),
-                Some(500),
+                0,
+                Some(150),
                 None,
             ),
             Monster::new(
                 Coord::new(cols as i32 / 4, rows as i32 / 4 + rows as i32 / 2),
+                0,
                 Some(200),
                 None,
             ),
@@ -409,6 +412,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
                     match kind {
                         event::MouseEventKind::Down(MouseButton::Left) => keyboard_tracker
+                            .register_event(KeyEvent::new_with_kind(
+                                KeyCode::Char('m'),
+                                KeyModifiers::empty(),
+                                event::KeyEventKind::Press,
+                            )),
+                        event::MouseEventKind::Up(MouseButton::Left) => keyboard_tracker
                             .register_event(KeyEvent::new_with_kind(
                                 KeyCode::Char('m'),
                                 KeyModifiers::empty(),
@@ -582,7 +591,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     && next_coord.y >= 0
                     && next_coord.y < rows
                 {
-                    state.player.step(next_pos);
+                    state.player.set_location(next_pos, ticker);
 
                     render_actions.push_back(RenderAction::Move {
                         symbol: state.player.symbol(),
@@ -600,21 +609,23 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 }
                 events.push((elapsed, unit_ticker, String::from("MissedMove")));
             }
+        }
 
-            let monsters_len = state.monsters.len();
+        let monsters_len = state.monsters.len();
 
-            for monster_ix in (0..monsters_len).rev() {
-                let mut monster = state.monsters.remove(monster_ix);
-                let new_pos = monster.seek(state.player.location, unit_ticker);
-                let next_coord = new_pos.as_coord();
+        for monster_ix in (0..monsters_len).rev() {
+            let mut monster = state.monsters.remove(monster_ix);
+            let prev_pos = monster.coord();
+            let mut new_pos = monster.seek(state.player.location, ticker);
+            let next_coord = new_pos.as_coord();
 
+            if next_coord != prev_pos {
+                let mut collision = false;
                 if next_coord.x >= 0
                     && next_coord.x < cols
                     && next_coord.y >= 0
                     && next_coord.y < rows
                 {
-                    let mut collision = false;
-
                     for other_ix in 0..(monsters_len - 1) {
                         let other_monster = &state.monsters[other_ix];
                         if other_monster.coord() == next_coord {
@@ -623,32 +634,33 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         }
                     }
 
-                    if !collision {
-                        let prev_pos = monster.coord();
-                        monster.step(new_pos);
-
-                        render_actions.push_back(RenderAction::Move {
-                            symbol: monster.symbol(),
-                            color: monster.color(),
-                            old: prev_pos,
-                            new: next_coord,
-                        });
-                    }
-
                     if monster.coord() == state.player.coord() {
                         state.score = 0;
                         exit = true;
                         break;
                     }
+                } else {
+                    collision = true;
                 }
 
-                state.monsters.push(monster);
+                if !collision {
+                    render_actions.push_back(RenderAction::Move {
+                        symbol: monster.symbol(),
+                        color: monster.color(),
+                        old: prev_pos,
+                        new: next_coord,
+                    });
+                } else {
+                    new_pos = monster.location();
+                }
             }
+            monster.set_location(new_pos, ticker);
+            state.monsters.push(monster);
         }
 
         if spawn_tick {
             if state.monsters.len() < 3 {
-                let monster = Monster::new(Coord::new(4, 4), None, None);
+                let monster = Monster::new(Coord::new(4, 4), ticker, None, None);
 
                 render_actions.push_back(RenderAction::Create {
                     symbol: monster.symbol(),
@@ -681,7 +693,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 stdout,
                 display.status_indicators.get("spells"),
                 &state.player,
-                unit_ticker,
+                ticker,
             )?;
 
             queue_value_draw(

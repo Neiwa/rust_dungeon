@@ -11,10 +11,11 @@ pub struct Player {
     pub max_energy: u32,
     pub spells: Vec<Box<dyn Magic>>,
     pub active_spell: usize,
+    last_tick: u128,
 }
 
 impl Player {
-    pub fn new(coord: Coord) -> Self {
+    pub fn new(coord: Coord, ticker: u128) -> Self {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
             energy: 100,
@@ -26,6 +27,7 @@ impl Player {
                 Box::new(InfernoMagic::new()),
             ],
             active_spell: 1,
+            last_tick: ticker,
         }
     }
 
@@ -47,12 +49,13 @@ impl Player {
 }
 
 impl Unit for Player {
-    fn step(&mut self, step: Point) {
-        self.location = step;
-    }
-
     fn speed(&self) -> f64 {
         1.0
+    }
+
+    fn set_location(&mut self, location: Point, ticker: u128) {
+        self.location = location;
+        self.last_tick = ticker;
     }
 }
 impl Entity for Player {

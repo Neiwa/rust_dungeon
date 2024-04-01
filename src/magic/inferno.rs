@@ -22,7 +22,7 @@ impl Magic for InfernoMagic {
     }
 
     fn cooldown(&self) -> u128 {
-        200
+        40_000
     }
 
     fn evoke(&mut self, location: Point, _direction: Point, ticker: u128) -> Vec<Box<dyn Object>> {

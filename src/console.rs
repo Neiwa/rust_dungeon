@@ -63,7 +63,7 @@ impl ConsoleUnit for Monster {
 
     fn symbol(&self) -> char {
         // let symbols = ['W', 'X', 'Y'];
-        SYMBOLS[self.id % SYMBOLS.len()]
+        SYMBOLS[(self.id % SYMBOLS.len() as u64) as usize]
     }
 
     fn coord(&self) -> Coord {
@@ -158,7 +158,6 @@ impl AsCommand for KeyboardState {
                 _ => None,
             },
             KeyboardState::Release(code) => match code {
-                KeyCode::Char('m') => Some(Command::EvokeMouse),
                 _ => None,
             },
             KeyboardState::Active(code) => match code {
@@ -170,6 +169,7 @@ impl AsCommand for KeyboardState {
                 KeyCode::Char('j') => Some(Command::Evoke(Direction::Left)),
                 KeyCode::Char('k') => Some(Command::Evoke(Direction::Down)),
                 KeyCode::Char('l') => Some(Command::Evoke(Direction::Right)),
+                KeyCode::Char('m') => Some(Command::EvokeMouse),
                 _ => None,
             },
         }

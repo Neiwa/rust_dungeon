@@ -1,7 +1,7 @@
 use command::{AsCommand, Command};
 use console::coord::AsDirection;
 use console::keyboard_state::KeyboardTracker;
-use console::{AsSymbol, ConsoleUnit};
+use console::{loader, AsSymbol, ConsoleUnit};
 use crossterm::event::{KeyModifiers, MouseButton, MouseEvent};
 use crossterm::{
     cursor,
@@ -256,7 +256,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
                 0,
                 Some(40),
-                Some(0.003),
+                Some(3.0),
             ),
             Monster::new(
                 Coord::new(
@@ -373,16 +373,13 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     stdout.flush()?;
 
-    let mut last_tick = 0;
-    let mut tick = false;
     let mut last_spawn_tick = 0;
-    let mut spawn_tick = true;
 
     let mut exit = false;
-    let mut player_moved = false;
     let mut keyboard_tracker = KeyboardTracker::new();
 
-    let mut events = Vec::new();
+    #[allow(dead_code, unused_mut)]
+    let mut events: Vec<(u128, String)> = Vec::new();
 
     let mut mouse_coord = Coord::new(0, 0);
 
@@ -432,19 +429,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         let elapsed = state.start.elapsed();
         let ticker = elapsed.as_millis();
 
-        let unit_ticker = elapsed.as_millis() / 200;
-        if unit_ticker > last_tick {
-            last_tick = unit_ticker;
-            tick = true;
-            player_moved = false;
-        }
-        let spawn_ticker = elapsed.as_secs() / 5;
-        if spawn_ticker > last_spawn_tick {
-            last_spawn_tick = spawn_ticker;
-            spawn_tick = true;
-        }
-
         let mut render_actions: VecDeque<RenderAction> = VecDeque::new();
+
+        // OBJECTS
 
         let object_len = state.objects.len();
 
@@ -502,114 +489,107 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             }
         }
 
-        if tick {
-            let keyboard_state = keyboard_tracker.calculate_state();
+        // PLAYER
 
-            let mut step: Option<Point> = None;
+        let keyboard_state = keyboard_tracker.calculate_state();
 
-            for key_state in keyboard_state {
-                match key_state.as_command() {
-                    Some(Command::Move(direction)) => {
-                        step = step + direction.as_point();
-                    }
-                    Some(Command::Evoke(direction)) => {
-                        if state.player.active_spell_can_evoke(ticker) {
-                            let mut objects = state
-                                .player
-                                .active_spell_evoke(direction.as_point(), ticker);
+        let mut step: Option<Point> = None;
 
-                            while let Some(object) = objects.pop() {
-                                let object_coord = object.location().as_coord();
+        for key_state in keyboard_state {
+            match key_state.as_command() {
+                Some(Command::Move(direction)) => {
+                    step = step + direction.as_point();
+                }
+                Some(Command::Evoke(direction)) => {
+                    if state.player.active_spell_can_evoke(ticker) {
+                        let mut objects = state
+                            .player
+                            .active_spell_evoke(direction.as_point(), ticker);
 
-                                if object_coord.x >= 0
-                                    && object_coord.x < cols
-                                    && object_coord.y >= 0
-                                    && object_coord.y < rows
-                                {
-                                    render_actions.push_back(RenderAction::Create {
-                                        symbol: object.symbol(),
-                                        color: object.color(),
-                                        coord: object_coord,
-                                    });
+                        while let Some(object) = objects.pop() {
+                            let object_coord = object.location().as_coord();
 
-                                    state.objects.push(object);
-                                }
+                            if object_coord.x >= 0
+                                && object_coord.x < cols
+                                && object_coord.y >= 0
+                                && object_coord.y < rows
+                            {
+                                render_actions.push_back(RenderAction::Create {
+                                    symbol: object.symbol(),
+                                    color: object.color(),
+                                    coord: object_coord,
+                                });
+
+                                state.objects.push(object);
                             }
                         }
                     }
-                    Some(Command::EvokeMouse) => {
-                        if state.player.active_spell_can_evoke(ticker) {
-                            let mut objects = state.player.active_spell_evoke(
-                                (mouse_coord.as_point() - state.player.location).normalize(1.0),
-                                ticker,
-                            );
+                }
+                Some(Command::EvokeMouse) => {
+                    if state.player.active_spell_can_evoke(ticker) {
+                        let mut objects = state.player.active_spell_evoke(
+                            (mouse_coord.as_point() - state.player.location).normalize(1.0),
+                            ticker,
+                        );
 
-                            while let Some(object) = objects.pop() {
-                                let object_coord = object.location().as_coord();
+                        while let Some(object) = objects.pop() {
+                            let object_coord = object.location().as_coord();
 
-                                if object_coord.x >= 0
-                                    && object_coord.x < cols
-                                    && object_coord.y >= 0
-                                    && object_coord.y < rows
-                                {
-                                    render_actions.push_back(RenderAction::Create {
-                                        symbol: object.symbol(),
-                                        color: object.color(),
-                                        coord: object_coord,
-                                    });
+                            if object_coord.x >= 0
+                                && object_coord.x < cols
+                                && object_coord.y >= 0
+                                && object_coord.y < rows
+                            {
+                                render_actions.push_back(RenderAction::Create {
+                                    symbol: object.symbol(),
+                                    color: object.color(),
+                                    coord: object_coord,
+                                });
 
-                                    state.objects.push(object);
-                                }
+                                state.objects.push(object);
                             }
                         }
                     }
-                    Some(Command::CycleSpell(false)) => {
-                        state.player.active_spell =
-                            (state.player.active_spell + state.player.spells.len() - 1)
-                                % state.player.spells.len()
-                    }
-                    Some(Command::CycleSpell(true)) => {
-                        state.player.active_spell =
-                            (state.player.active_spell + 1) % state.player.spells.len()
-                    }
-                    Some(Command::SelectSpell(index)) => {
-                        if index < state.player.spells.len() {
-                            state.player.active_spell = index;
-                        }
-                    }
-                    _ => {}
                 }
-            }
-
-            if let Some(vec) = step {
-                let prev_pos = state.player.location.as_coord();
-                let next_pos = state.player.location + vec.normalize(state.player.speed());
-                let next_coord = next_pos.as_coord();
-
-                if next_coord.x >= 0
-                    && next_coord.x < cols
-                    && next_coord.y >= 0
-                    && next_coord.y < rows
-                {
-                    state.player.set_location(next_pos, ticker);
-
-                    render_actions.push_back(RenderAction::Move {
-                        symbol: state.player.symbol(),
-                        color: state.player.color(),
-                        old: prev_pos,
-                        new: state.player.coord(),
-                    });
-                    player_moved = true;
+                Some(Command::CycleSpell(false)) => {
+                    state.player.active_spell =
+                        (state.player.active_spell + state.player.spells.len() - 1)
+                            % state.player.spells.len()
                 }
-            }
-
-            if !player_moved {
-                if state.player.energy < state.player.max_energy {
-                    state.player.energy += 1;
+                Some(Command::CycleSpell(true)) => {
+                    state.player.active_spell =
+                        (state.player.active_spell + 1) % state.player.spells.len()
                 }
-                events.push((elapsed, unit_ticker, String::from("MissedMove")));
+                Some(Command::SelectSpell(index)) => {
+                    if index < state.player.spells.len() {
+                        state.player.active_spell = index;
+                    }
+                }
+                _ => {}
             }
         }
+
+        if let Some(vec) = step {
+            let prev_pos = state.player.location.as_coord();
+            let next_pos = state.player.next_location(vec, ticker);
+            let next_coord = next_pos.as_coord();
+
+            if next_coord.x >= 0 && next_coord.x < cols && next_coord.y >= 0 && next_coord.y < rows
+            {
+                state.player.set_location(next_pos, ticker);
+
+                render_actions.push_back(RenderAction::Move {
+                    symbol: state.player.symbol(),
+                    color: state.player.color(),
+                    old: prev_pos,
+                    new: state.player.coord(),
+                });
+            }
+        } else {
+            state.player.charge_energy(ticker);
+        }
+
+        // MONSTERS
 
         let monsters_len = state.monsters.len();
 
@@ -658,55 +638,63 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             state.monsters.push(monster);
         }
 
-        if spawn_tick {
-            if state.monsters.len() < 3 {
-                let monster = Monster::new(Coord::new(4, 4), ticker, None, None);
+        // SPAWN MONSTERS
 
-                render_actions.push_back(RenderAction::Create {
-                    symbol: monster.symbol(),
-                    color: monster.color(),
-                    coord: monster.coord(),
-                });
+        if state.monsters.len() < 3 && ticker.saturating_sub(last_spawn_tick) >= 5_000 {
+            let monster = Monster::new(Coord::new(4, 4), ticker, None, None);
 
-                state.monsters.push(monster);
-            }
+            render_actions.push_back(RenderAction::Create {
+                symbol: monster.symbol(),
+                color: monster.color(),
+                coord: monster.coord(),
+            });
+
+            state.monsters.push(monster);
+
+            last_spawn_tick = ticker;
         }
 
-        if tick || spawn_tick || render_actions.len() > 0 {
-            execute!(stdout, terminal::BeginSynchronizedUpdate)?;
+        // DRAWING
 
-            queue_actions_draw(stdout, render_actions.into_iter())?;
+        execute!(stdout, terminal::BeginSynchronizedUpdate)?;
 
-            queue_value_draw(
-                stdout,
-                display.status_indicators.get("clock"),
-                format!("{:>3}", elapsed.as_secs()),
-            )?;
+        queue_actions_draw(stdout, render_actions.into_iter())?;
 
-            queue_value_draw(
-                stdout,
-                display.status_indicators.get("score"),
-                format!("{:>3}", state.score),
-            )?;
+        queue_value_draw(
+            stdout,
+            display.status_indicators.get("clock"),
+            format!("{:>3}", elapsed.as_secs()),
+        )?;
 
-            queue_spells_draw(
-                stdout,
-                display.status_indicators.get("spells"),
-                &state.player,
-                ticker,
-            )?;
+        queue_value_draw(
+            stdout,
+            display.status_indicators.get("score"),
+            format!("{:>3}", state.score),
+        )?;
 
-            queue_value_draw(
-                stdout,
-                display.status_indicators.get("energy"),
-                format!("🧪 {:0>3}", state.player.energy),
-            )?;
+        queue_spells_draw(
+            stdout,
+            display.status_indicators.get("spells"),
+            &state.player,
+            ticker,
+        )?;
 
-            stdout.flush()?;
-            execute!(stdout, terminal::EndSynchronizedUpdate)?;
-        }
-        tick = false;
-        spawn_tick = false;
+        queue_value_draw(
+            stdout,
+            display.status_indicators.get("energy"),
+            format!(
+                "🧪 {:0>3} {}",
+                state.player.energy,
+                loader(
+                    state.player.energy.into(),
+                    state.player.max_energy.into(),
+                    state.player.max_energy.into()
+                )
+            ),
+        )?;
+
+        stdout.flush()?;
+        execute!(stdout, terminal::EndSynchronizedUpdate)?;
 
         if state.player.coord() == Coord::new(1, 1) || exit {
             break;
@@ -714,13 +702,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     }
 
     let mut file = File::create("rust_dungeon.log")?;
-    for (duration, ticker, log) in events {
-        file.write_fmt(format_args!(
-            "{:>10}\t{:>3}\t{:}\n",
-            duration.as_millis(),
-            ticker,
-            log
-        ))?;
+    for (ticker, log) in events {
+        file.write_fmt(format_args!("{:>3}\t{:}\n", ticker, log))?;
     }
 
     Ok(state.score)

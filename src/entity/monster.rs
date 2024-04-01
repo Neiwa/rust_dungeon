@@ -24,13 +24,13 @@ impl Monster {
         Self {
             location: Point::new(coord.x as f64, coord.y as f64),
             logic: logic.unwrap_or(100),
-            speed: speed.unwrap_or(0.002),
+            speed: speed.unwrap_or(2.0) / 1000.0,
             id: random(),
             last_tick: ticker,
         }
     }
     pub fn seek(&self, seek_point: Point, ticker: u128) -> Point {
-        let mut rng = StdRng::seed_from_u64((ticker as u64 / 2000).wrapping_add(self.id));
+        let mut rng = StdRng::seed_from_u64((ticker as u64).wrapping_add(self.id) / 2000);
 
         let step = match rng.gen::<usize>() % self.logic {
             ..=39 => seek_point - self.location,

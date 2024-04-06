@@ -200,7 +200,7 @@ impl<'a> Display<'a> {
         queue_value_draw(
             self.stdout,
             self.status_indicators.get("clock"),
-            format!("{:>3}", state.start.elapsed().as_secs()),
+            format!("{:>3}", state.ticker / 1000),
         )?;
         queue_value_draw(
             self.stdout,

@@ -29,7 +29,6 @@ use crate::entity::*;
 
 struct State {
     score: i32,
-    start: Instant,
     ticker: u128,
     monsters: Vec<Monster>,
     player: Player,
@@ -81,8 +80,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         stdout,
     );
 
+    let timer = Instant::now();
+
     let mut state = State {
-        start: Instant::now(),
         ticker: 0,
         score: 0,
         player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2), 0),
@@ -138,7 +138,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 _ => {}
             }
         }
-        state.ticker = state.start.elapsed().as_millis();
+        state.ticker = timer.elapsed().as_millis();
 
         // OBJECTS
 

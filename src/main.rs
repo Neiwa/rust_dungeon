@@ -11,12 +11,13 @@ use display::Display;
 use entity::monster::Monster;
 use entity::object::Object;
 use entity::player::Player;
-use env_logger::Builder;
 use log::{info, trace, LevelFilter};
 use nalgebra::{Point2, Scale2, Vector2};
 use render_action::RenderAction;
+use simplelog::{format_description, ConfigBuilder, WriteLogger};
 
 use std::{
+    fs::File,
     io,
     time::{Duration, Instant},
 };
@@ -51,12 +52,20 @@ impl AsCoord for Point2<f64> {
 }
 
 fn main() -> io::Result<()> {
-    Builder::new()
-        .filter_level(LevelFilter::max())
-        .format_timestamp_millis()
-        // .parse_default_env()
-        // .filter_module("rust_dungeon::console::console_display", LevelFilter::Info)
-        .init();
+    WriteLogger::init(
+        LevelFilter::Trace,
+        ConfigBuilder::new()
+            .set_thread_level(LevelFilter::Off)
+            .set_time_format_custom(format_description!(
+                "[hour]:[minute]:[second].[subsecond digits:3]"
+            ))
+            .set_time_offset_to_local()
+            .unwrap()
+            .build(),
+        File::create("rust_dungeon.log").unwrap(),
+    )
+    .unwrap();
+
     info!("Running");
 
     let (cols, rows) = size()?;
@@ -96,9 +105,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let cols = (((t_cols - 2) / 2) as i32).clamp(0, 30);
     let rows = ((t_rows - 2) as i32).clamp(0, 30);
 
+    let bounds = Vector2::<f64>::new(cols.into(), rows.into());
+
     let mut display = ConsoleDisplay::new(
         Point2::new(0, 0),
-        Vector2::new((cols * 2 + 2) as u16, (rows + 2) as u16),
+        Vector2::new((cols * 2 + 3) as u16, (rows + 2) as u16),
         Scale2::new(2, 1),
         stdout,
     );
@@ -108,26 +119,23 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut state = State {
         ticker: 0,
         score: 0,
-        player: Player::new(Point2::new(cols as f64 / 2.0, rows as f64 / 2.0), 0),
+        player: Player::new(Point2::new(bounds.x / 2.0, bounds.y / 2.0), 0),
         monsters: vec![
-            Monster::new_simple(Point2::new(cols as f64 / 4.0, rows as f64 / 4.0), 0),
+            Monster::new_simple(Point2::new(bounds.x / 4.0, bounds.y / 4.0), 0),
             Monster::new(
-                Point2::new(cols as f64 / 4.0 + cols as f64 / 2.0, rows as f64 / 4.0),
+                Point2::new(bounds.x * 3.0 / 4.0, bounds.y / 4.0),
                 0,
                 Some(40),
                 Some(3.0),
             ),
             Monster::new(
-                Point2::new(
-                    cols as f64 / 4.0 + cols as f64 / 2.0,
-                    rows as f64 / 4.0 + rows as f64 / 2.0,
-                ),
+                Point2::new(bounds.x * 3.0 / 4.0, bounds.y * 3.0 / 4.0),
                 0,
                 Some(150),
                 None,
             ),
             Monster::new(
-                Point2::new(cols as f64 / 4.0, rows as f64 / 4.0 + rows as f64 / 2.0),
+                Point2::new(bounds.x / 4.0, bounds.y * 3.0 / 4.0),
                 0,
                 Some(200),
                 None,
@@ -185,22 +193,22 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         for object_ix in (0..object_len).rev() {
             let object = &state.objects[object_ix];
             let old_pos = object.location();
-            let new_pos = object.next_location(state.ticker);
+            let next_pos = object.next_location(state.ticker);
 
             let old_coord = old_pos.as_coord();
-            let next_coord = new_pos.as_coord();
+            let next_coord = next_pos.as_coord();
 
             if old_coord != next_coord {
                 let mut object = state.objects.remove(object_ix);
-                if next_coord.x >= 0
-                    && next_coord.x < cols
-                    && next_coord.y >= 0
-                    && next_coord.y < rows
+                if next_pos.x > 0.0
+                    && next_pos.x < bounds.x
+                    && next_pos.y > 0.0
+                    && next_pos.y < bounds.y
                 {
                     let mut hit = false;
 
                     for monster_ix in 0..state.monsters.len() {
-                        if (state.monsters[monster_ix].location() - new_pos).magnitude() < 1.0 {
+                        if (state.monsters[monster_ix].location() - next_pos).magnitude() < 1.0 {
                             state.score += 1;
 
                             let monster = state.monsters.remove(monster_ix);
@@ -218,13 +226,13 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     }
 
                     if !hit {
-                        object.set_location(new_pos, state.ticker);
+                        object.set_location(next_pos, state.ticker);
 
                         display.enqueue_action(RenderAction::Move {
                             symbol: object.symbol(),
                             color: object.color(),
                             old: old_pos,
-                            new: new_pos,
+                            new: next_pos,
                         });
                         state.objects.push(object);
                     }
@@ -261,10 +269,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         while let Some(object) = objects.pop() {
                             let location = object.location();
 
-                            if location.x >= 0.0
-                                && location.x < cols as f64
-                                && location.y >= 0.0
-                                && location.y < rows as f64
+                            if location.x > 0.0
+                                && location.x < bounds.x
+                                && location.y > 0.0
+                                && location.y < bounds.y
                             {
                                 display.enqueue_action(RenderAction::Create {
                                     symbol: object.symbol(),
@@ -287,10 +295,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         while let Some(object) = objects.pop() {
                             let location = object.location();
 
-                            if location.x >= 0.0
-                                && location.x < cols as f64
-                                && location.y >= 0.0
-                                && location.y < rows as f64
+                            if location.x > 0.0
+                                && location.x < bounds.x
+                                && location.y > 0.0
+                                && location.y < bounds.y
                             {
                                 display.enqueue_action(RenderAction::Create {
                                     symbol: object.symbol(),
@@ -325,11 +333,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             let prev_pos = state.player.location();
             let next_pos = state.player.next_location(step, state.ticker);
 
-            if next_pos.x >= 0.0
-                && next_pos.x < cols as f64
-                && next_pos.y >= 0.0
-                && next_pos.y < rows as f64
+            if next_pos.x > 0.0
+                && next_pos.x < bounds.x
+                && next_pos.y > 0.0
+                && next_pos.y < bounds.y
             {
+                trace!("Player at {:?} {:?}", next_pos.as_coord(), next_pos);
                 state.player.set_location(next_pos, state.ticker);
 
                 display.enqueue_action(RenderAction::Move {
@@ -359,10 +368,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
                 if next_coord != old_coord {
                     let mut collision = false;
-                    if next_coord.x >= 0
-                        && next_coord.x < cols
-                        && next_coord.y >= 0
-                        && next_coord.y < rows
+                    if next_pos.x > 0.0
+                        && next_pos.x < bounds.x
+                        && next_pos.y > 0.0
+                        && next_pos.y < bounds.y
                     {
                         for other_ix in 0..(monsters_len - 1) {
                             let other_monster = &state.monsters[other_ix];

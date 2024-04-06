@@ -1,5 +1,5 @@
 use command::{AsCommand, Command};
-use console::{AsCoord, ConsoleUnit, Coord, Display, InputTracker};
+use console::{AsCoord, ConsoleDisplay, ConsoleUnit, Coord, InputTracker};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -7,6 +7,7 @@ use crossterm::{
     terminal::{self, size, SetSize},
 };
 
+use display::Display;
 use entity::monster::Monster;
 use entity::object::Object;
 use entity::player::Player;
@@ -21,6 +22,7 @@ use std::{
 
 mod command;
 mod console;
+mod display;
 mod entity;
 mod magic;
 pub mod point;
@@ -73,7 +75,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let cols = (((t_cols - 2) / 2) as i32).clamp(0, 30);
     let rows = ((t_rows - 2) as i32).clamp(0, 30);
 
-    let mut display = Display::new(
+    let mut display = ConsoleDisplay::new(
         Coord::new(0, 0),
         Coord::new(cols * 2 + 1, rows + 1),
         Point::new(2.0, 1.0),

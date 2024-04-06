@@ -10,9 +10,9 @@ use crossterm::{
 };
 
 use super::{loader, loader_reverse, AsColor, AsSymbol, ConsoleUnit, Coord};
-use crate::{player::Player, point::Point, render_action::RenderAction, State};
+use crate::{display::Display, player::Player, point::Point, render_action::RenderAction, State};
 
-pub struct Display<'a> {
+pub struct ConsoleDisplay<'a> {
     pub status_indicators: HashMap<&'a str, Indicator>,
     top_left: Coord,
     bottom_right: Coord,
@@ -30,7 +30,7 @@ fn bg_color(coord: Coord) -> Color {
     Color::Rgb { r, g, b }
 }
 
-impl<'a> Display<'a> {
+impl<'a> ConsoleDisplay<'a> {
     pub fn new(
         top_left: Coord,
         bottom_right: Coord,
@@ -55,86 +55,6 @@ impl<'a> Display<'a> {
             ]),
             render_actions: VecDeque::new(),
         }
-    }
-
-    pub fn enqueue_action(&mut self, action: RenderAction) {
-        self.render_actions.push_back(action);
-    }
-
-    pub fn draw_initial(&mut self, state: &State) -> io::Result<()> {
-        execute!(self.stdout, terminal::Clear(terminal::ClearType::All))?;
-
-        for y in 0..=self.height {
-            for x in 0..=self.width {
-                let content = match (x, y) {
-                    (0, 0) => "╔".magenta(),
-                    (0, y) if y == self.height => "╚".magenta(),
-                    (x, 0) if x == self.width => "╗".magenta(),
-                    (x, y) if x == self.width && y == self.height => "╝".magenta(),
-                    (0, _) => "║".magenta(),
-                    (x, _) if x == self.width => "║".magenta(),
-                    (_, 0) => "═".magenta(),
-                    (_, y) if y == self.height => "═".magenta(),
-                    _ => " ".on(bg_color(Coord::new(
-                        (x as f64 * self.resolution.x) as i32,
-                        (y as f64 * self.resolution.y) as i32,
-                    ))),
-                };
-
-                queue!(
-                    self.stdout,
-                    cursor::MoveTo(
-                        (self.top_left.x as u32 + x) as u16,
-                        (self.top_left.y as u32 + y) as u16
-                    ),
-                    style::PrintStyledContent(content)
-                )?;
-            }
-        }
-
-        let initial_actions = state
-            .monsters
-            .iter()
-            .map(|m| RenderAction::Create {
-                symbol: m.symbol(),
-                color: m.color(),
-                coord: m.coord(),
-            })
-            .chain([
-                RenderAction::Create {
-                    symbol: state.player.symbol(),
-                    color: state.player.color(),
-                    coord: state.player.coord(),
-                },
-                RenderAction::Create {
-                    symbol: '🚪',
-                    color: Color::White,
-                    coord: Coord::new(1, 1),
-                },
-            ]);
-
-        for action in initial_actions {
-            self.enqueue_action(action);
-        }
-
-        self.draw_state(state)?;
-
-        self.stdout.flush()?;
-
-        Ok(())
-    }
-
-    pub fn draw(&mut self, state: &State) -> io::Result<()> {
-        execute!(self.stdout, terminal::BeginSynchronizedUpdate)?;
-
-        self.draw_actions()?;
-
-        self.draw_state(state)?;
-
-        self.stdout.flush()?;
-        execute!(self.stdout, terminal::EndSynchronizedUpdate)?;
-
-        Ok(())
     }
 
     fn draw_actions(&mut self) -> io::Result<()> {
@@ -228,6 +148,88 @@ impl<'a> Display<'a> {
                 )
             ),
         )?;
+
+        Ok(())
+    }
+}
+
+impl Display for ConsoleDisplay<'_> {
+    fn enqueue_action(&mut self, action: RenderAction) {
+        self.render_actions.push_back(action);
+    }
+
+    fn draw_initial(&mut self, state: &State) -> io::Result<()> {
+        execute!(self.stdout, terminal::Clear(terminal::ClearType::All))?;
+
+        for y in 0..=self.height {
+            for x in 0..=self.width {
+                let content = match (x, y) {
+                    (0, 0) => "╔".magenta(),
+                    (0, y) if y == self.height => "╚".magenta(),
+                    (x, 0) if x == self.width => "╗".magenta(),
+                    (x, y) if x == self.width && y == self.height => "╝".magenta(),
+                    (0, _) => "║".magenta(),
+                    (x, _) if x == self.width => "║".magenta(),
+                    (_, 0) => "═".magenta(),
+                    (_, y) if y == self.height => "═".magenta(),
+                    _ => " ".on(bg_color(Coord::new(
+                        (x as f64 * self.resolution.x) as i32,
+                        (y as f64 * self.resolution.y) as i32,
+                    ))),
+                };
+
+                queue!(
+                    self.stdout,
+                    cursor::MoveTo(
+                        (self.top_left.x as u32 + x) as u16,
+                        (self.top_left.y as u32 + y) as u16
+                    ),
+                    style::PrintStyledContent(content)
+                )?;
+            }
+        }
+
+        let initial_actions = state
+            .monsters
+            .iter()
+            .map(|m| RenderAction::Create {
+                symbol: m.symbol(),
+                color: m.color(),
+                coord: m.coord(),
+            })
+            .chain([
+                RenderAction::Create {
+                    symbol: state.player.symbol(),
+                    color: state.player.color(),
+                    coord: state.player.coord(),
+                },
+                RenderAction::Create {
+                    symbol: '🚪',
+                    color: Color::White,
+                    coord: Coord::new(1, 1),
+                },
+            ]);
+
+        for action in initial_actions {
+            self.enqueue_action(action);
+        }
+
+        self.draw_state(state)?;
+
+        self.stdout.flush()?;
+
+        Ok(())
+    }
+
+    fn draw(&mut self, state: &State) -> io::Result<()> {
+        execute!(self.stdout, terminal::BeginSynchronizedUpdate)?;
+
+        self.draw_actions()?;
+
+        self.draw_state(state)?;
+
+        self.stdout.flush()?;
+        execute!(self.stdout, terminal::EndSynchronizedUpdate)?;
 
         Ok(())
     }

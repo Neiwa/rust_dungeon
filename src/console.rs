@@ -1,5 +1,6 @@
 pub mod coord;
-pub mod keyboard_state;
+pub mod input;
+pub mod input_tracker;
 
 use crossterm::{event::KeyCode, style::Color};
 
@@ -12,7 +13,7 @@ use crate::{
     AsCoord, AsDirection, Coord, Direction,
 };
 
-use self::keyboard_state::KeyboardState;
+use input::{Input, InputState};
 
 pub trait ConsoleUnit {
     fn color(&self) -> Color;
@@ -140,10 +141,10 @@ impl AsCommand for KeyCode {
     }
 }
 
-impl AsCommand for KeyboardState {
+impl AsCommand for InputState {
     fn as_command(&self) -> Option<Command> {
         match self {
-            KeyboardState::Press(code) => match code {
+            InputState::Press(Input::Key(code)) => match code {
                 KeyCode::Char('u') | KeyCode::Char('q') => Some(Command::CycleSpell(false)),
                 KeyCode::Char('o') | KeyCode::Char('e') => Some(Command::CycleSpell(true)),
                 KeyCode::Char('1') => Some(Command::SelectSpell(0)),
@@ -157,10 +158,10 @@ impl AsCommand for KeyboardState {
                 KeyCode::Char('9') => Some(Command::SelectSpell(8)),
                 _ => None,
             },
-            KeyboardState::Release(code) => match code {
+            InputState::Release(code) => match code {
                 _ => None,
             },
-            KeyboardState::Active(code) => match code {
+            InputState::Active(Input::Key(code)) => match code {
                 KeyCode::Up | KeyCode::Char('w') => Some(Command::Move(Direction::Up)),
                 KeyCode::Left | KeyCode::Char('a') => Some(Command::Move(Direction::Left)),
                 KeyCode::Down | KeyCode::Char('s') => Some(Command::Move(Direction::Down)),
@@ -169,9 +170,10 @@ impl AsCommand for KeyboardState {
                 KeyCode::Char('j') => Some(Command::Evoke(Direction::Left)),
                 KeyCode::Char('k') => Some(Command::Evoke(Direction::Down)),
                 KeyCode::Char('l') => Some(Command::Evoke(Direction::Right)),
-                KeyCode::Char('m') => Some(Command::EvokeMouse),
                 _ => None,
             },
+            InputState::Active(Input::MouseLeft) => Some(Command::EvokeMouse),
+            _ => None,
         }
     }
 }

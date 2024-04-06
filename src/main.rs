@@ -1,8 +1,7 @@
 use command::{AsCommand, Command};
 use console::coord::AsDirection;
-use console::keyboard_state::KeyboardTracker;
+use console::input_tracker::InputTracker;
 use console::{loader, AsSymbol, ConsoleUnit};
-use crossterm::event::{KeyModifiers, MouseButton, MouseEvent};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -376,52 +375,22 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut last_spawn_tick = 0;
 
     let mut exit = false;
-    let mut keyboard_tracker = KeyboardTracker::new();
+    let mut input_tracker = InputTracker::new();
 
     #[allow(dead_code, unused_mut)]
     let mut events: Vec<(u128, String)> = Vec::new();
 
-    let mut mouse_coord = Coord::new(0, 0);
-
     loop {
         if poll(Duration::from_millis(20))? {
             let event = read();
-
             match event {
-                Ok(Event::Key(key_event)) => {
-                    keyboard_tracker.register_event(key_event);
-                    match key_event {
-                        KeyEvent {
-                            code: KeyCode::Esc, ..
-                        } => {
-                            exit = true;
-                        }
-                        _ => {}
-                    }
-                }
-                Ok(Event::Mouse(MouseEvent {
-                    column, row, kind, ..
+                Ok(Event::Key(KeyEvent {
+                    code: KeyCode::Esc, ..
                 })) => {
-                    mouse_coord = Coord::new(
-                        (column.saturating_sub(1) / 2).into(),
-                        row.saturating_sub(1).into(),
-                    );
-
-                    match kind {
-                        event::MouseEventKind::Down(MouseButton::Left) => keyboard_tracker
-                            .register_event(KeyEvent::new_with_kind(
-                                KeyCode::Char('m'),
-                                KeyModifiers::empty(),
-                                event::KeyEventKind::Press,
-                            )),
-                        event::MouseEventKind::Up(MouseButton::Left) => keyboard_tracker
-                            .register_event(KeyEvent::new_with_kind(
-                                KeyCode::Char('m'),
-                                KeyModifiers::empty(),
-                                event::KeyEventKind::Release,
-                            )),
-                        _ => {}
-                    };
+                    exit = true;
+                }
+                Ok(ok_event) => {
+                    input_tracker.register_input_event(ok_event);
                 }
                 _ => {}
             }
@@ -491,11 +460,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         // PLAYER
 
-        let keyboard_state = keyboard_tracker.calculate_state();
+        let (input_state, cursor_coord) = input_tracker.calculate_state();
+        let mouse_coord = Coord::new(
+            (cursor_coord.x.saturating_sub(1) / 2).into(),
+            cursor_coord.y.saturating_sub(1).into(),
+        );
 
         let mut step: Option<Point> = None;
 
-        for key_state in keyboard_state {
+        for key_state in input_state {
             match key_state.as_command() {
                 Some(Command::Move(direction)) => {
                     step = step + direction.as_point();

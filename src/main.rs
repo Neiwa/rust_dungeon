@@ -1,13 +1,9 @@
 use command::{AsCommand, Command};
-use console::{
-    loader, loader_reverse, AsColor, AsCoord, AsSymbol, ConsoleUnit, Coord, Display, Indicator,
-    InputTracker,
-};
+use console::{AsCoord, ConsoleUnit, Coord, Display, InputTracker};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
-    execute, queue,
-    style::{self, Color, Stylize},
+    execute,
     terminal::{self, size, SetSize},
 };
 
@@ -16,8 +12,6 @@ use entity::object::Object;
 use entity::player::Player;
 use point::{AsPoint, Point};
 use render_action::RenderAction;
-
-use std::collections::HashSet;
 
 use std::{
     collections::VecDeque,
@@ -37,16 +31,10 @@ use crate::entity::*;
 struct State {
     score: i32,
     start: Instant,
+    ticker: u128,
     monsters: Vec<Monster>,
     player: Player,
     objects: Vec<Box<dyn Object>>,
-}
-
-fn bg_color(_coord: Coord) -> Color {
-    let r = (2 + (_coord.x * _coord.y ^ 34348798) % 5) as u8;
-    let g = (100 + (_coord.x * _coord.y ^ 2344839) % 15) as u8;
-    let b = 0;
-    Color::Rgb { r, g, b }
 }
 
 fn main() -> io::Result<()> {
@@ -82,154 +70,6 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn queue_value_draw(
-    stdout: &mut io::Stdout,
-    indicator: Option<&Indicator>,
-    value: String,
-) -> io::Result<()> {
-    if indicator.is_none() {
-        return Ok(());
-    }
-
-    let ind = indicator.unwrap();
-
-    queue!(
-        stdout,
-        cursor::MoveTo(ind.coord.x as u16, ind.coord.y as u16),
-        style::PrintStyledContent(value.with(ind.color).on(ind.bg_color)),
-    )?;
-
-    Ok(())
-}
-
-fn queue_spells_draw(
-    stdout: &mut io::Stdout,
-    indicator: Option<&Indicator>,
-    player: &Player,
-    ticker: u128,
-) -> io::Result<()> {
-    if indicator.is_none() {
-        return Ok(());
-    }
-
-    let ind = indicator.unwrap();
-
-    queue!(
-        stdout,
-        cursor::MoveTo(ind.coord.x as u16, ind.coord.y as u16)
-    )?;
-
-    let spell_len = player.spells.len();
-    for i in 0..spell_len {
-        let spell = &player.spells[i];
-        let is_active = i == player.active_spell;
-
-        let (color, bg_color) = match (is_active, player.energy >= spell.cost()) {
-            (true, true) => (Color::DarkMagenta, ind.color),
-            (true, false) => (Color::DarkGrey, ind.color),
-            (false, true) => (ind.color, ind.bg_color),
-            (false, false) => (Color::Grey, ind.bg_color),
-        };
-
-        if i > 0 {
-            queue!(
-                stdout,
-                style::PrintStyledContent("═".with(ind.bg_color).on(Color::Black))
-            )?;
-        }
-        queue!(
-            stdout,
-            style::PrintStyledContent(
-                spell
-                    .get_spell()
-                    .as_symbol()
-                    .with(spell.get_spell().as_color())
-                    .on(bg_color)
-            ),
-            style::PrintStyledContent(
-                format!(
-                    "{}",
-                    loader_reverse(
-                        spell
-                            .cooldown()
-                            .saturating_sub(spell.remaining_cooldown(ticker)),
-                        spell.cooldown(),
-                        spell.cooldown()
-                    ),
-                )
-                .with(spell.get_spell().as_color())
-                .on(bg_color)
-            ),
-            style::PrintStyledContent(format!("{:0>2}", spell.cost()).with(color).on(bg_color)),
-            style::PrintStyledContent("═".with(ind.bg_color).on(Color::Black))
-        )?;
-    }
-
-    Ok(())
-}
-
-fn queue_actions_draw<I>(stdout: &mut io::Stdout, render_actions: I) -> io::Result<()>
-where
-    I: Iterator<Item = RenderAction>,
-{
-    let mut clear: HashSet<Coord> = HashSet::new();
-    let mut skip_clear: HashSet<Coord> = HashSet::new();
-    let mut renders = Vec::new();
-
-    for render in render_actions {
-        match render {
-            RenderAction::Move {
-                old,
-                new,
-                symbol,
-                color,
-            } => {
-                clear.insert(old);
-                skip_clear.insert(new);
-                renders.push((new, symbol, color));
-            }
-            RenderAction::Remove { coord, .. } => {
-                clear.insert(coord);
-            }
-            RenderAction::Create {
-                coord,
-                symbol,
-                color,
-            } => {
-                skip_clear.insert(coord);
-                renders.push((coord, symbol, color));
-            }
-        };
-    }
-
-    for coord in clear {
-        if !skip_clear.contains(&coord) {
-            queue!(
-                stdout,
-                cursor::MoveTo((2 * coord.x + 1) as u16, (coord.y + 1) as u16),
-                style::PrintStyledContent(
-                    ' '.on(bg_color(Coord::new(coord.x * 2 + 1, coord.y + 1)))
-                ),
-                style::PrintStyledContent(
-                    ' '.on(bg_color(Coord::new(coord.x * 2 + 2, coord.y + 1)))
-                ),
-            )?;
-        }
-    }
-
-    for render in renders {
-        match render {
-            (coord, symbol, color) => queue!(
-                stdout,
-                cursor::MoveTo((2 * coord.x + 1) as u16, (coord.y + 1) as u16),
-                style::PrintStyledContent(symbol.with(color).on(bg_color(coord))),
-            )?,
-        }
-    }
-
-    Ok(())
-}
-
 fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let (t_cols, t_rows) = size()?;
     let cols = (((t_cols - 2) / 2) as i32).clamp(0, 30);
@@ -237,6 +77,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
     let mut state = State {
         start: Instant::now(),
+        ticker: 0,
         score: 0,
         player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2), 0),
         monsters: vec![
@@ -272,64 +113,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         Point::new(2.0, 1.0),
     );
 
-    execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
-    for y in 0..rows + 2 {
-        for x in 0..2 * cols + 2 {
-            let content = match (x, y) {
-                (0, 0) => "╔".magenta(),
-                (0, y) if y == rows + 1 => "╚".magenta(),
-                (x, 0) if x == 2 * cols + 1 => "╗".magenta(),
-                (x, y) if x == 2 * cols + 1 && y == rows + 1 => "╝".magenta(),
-                (0, _) => "║".magenta(),
-                (x, _) if x == 2 * cols + 1 => "║".magenta(),
-                (_, 0) => "═".magenta(),
-                (_, y) if y == rows + 1 => "═".magenta(),
-                _ => " ".on(bg_color(Coord::new(2 * x + 1, y + 1))),
-            };
-
-            queue!(
-                stdout,
-                cursor::MoveTo(x as u16, y as u16),
-                style::PrintStyledContent(content)
-            )?;
-        }
-    }
-    queue_value_draw(
-        stdout,
-        display.status_indicators.get("clock"),
-        format!("{:>3}", state.start.elapsed().as_secs()),
-    )?;
-    queue_value_draw(
-        stdout,
-        display.status_indicators.get("score"),
-        format!("{:>3}", state.score),
-    )?;
-
-    queue_actions_draw(
-        stdout,
-        state
-            .monsters
-            .iter()
-            .map(|m| RenderAction::Create {
-                symbol: m.symbol(),
-                color: m.color(),
-                coord: m.coord(),
-            })
-            .chain([
-                RenderAction::Create {
-                    symbol: state.player.symbol(),
-                    color: state.player.color(),
-                    coord: state.player.coord(),
-                },
-                RenderAction::Create {
-                    symbol: '🚪',
-                    color: Color::White,
-                    coord: Coord::new(1, 1),
-                },
-            ]),
-    )?;
-
-    stdout.flush()?;
+    display.draw_initial(stdout, &state)?;
 
     let mut last_spawn_tick = 0;
 
@@ -354,8 +138,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 _ => {}
             }
         }
-        let elapsed = state.start.elapsed();
-        let ticker = elapsed.as_millis();
+        state.ticker = state.start.elapsed().as_millis();
 
         let mut render_actions: VecDeque<RenderAction> = VecDeque::new();
 
@@ -366,7 +149,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         for object_ix in (0..object_len).rev() {
             let object = &state.objects[object_ix];
             let prev_coord = object.location().as_coord();
-            let new_pos = object.next_location(ticker);
+            let new_pos = object.next_location(state.ticker);
 
             let next_coord = new_pos.as_coord();
 
@@ -398,7 +181,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     }
 
                     if !hit {
-                        object.set_location(new_pos, ticker);
+                        object.set_location(new_pos, state.ticker);
 
                         render_actions.push_back(RenderAction::Move {
                             symbol: object.symbol(),
@@ -433,10 +216,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     step = step + direction.as_point();
                 }
                 Some(Command::Evoke(direction)) => {
-                    if state.player.active_spell_can_evoke(ticker) {
+                    if state.player.active_spell_can_evoke(state.ticker) {
                         let mut objects = state
                             .player
-                            .active_spell_evoke(direction.as_point(), ticker);
+                            .active_spell_evoke(direction.as_point(), state.ticker);
 
                         while let Some(object) = objects.pop() {
                             let object_coord = object.location().as_coord();
@@ -458,10 +241,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     }
                 }
                 Some(Command::EvokeMouse) => {
-                    if state.player.active_spell_can_evoke(ticker) {
+                    if state.player.active_spell_can_evoke(state.ticker) {
                         let mut objects = state.player.active_spell_evoke(
                             (mouse_coord.as_point() - state.player.location).normalize(1.0),
-                            ticker,
+                            state.ticker,
                         );
 
                         while let Some(object) = objects.pop() {
@@ -503,12 +286,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         if let Some(vec) = step {
             let prev_pos = state.player.location.as_coord();
-            let next_pos = state.player.next_location(vec, ticker);
+            let next_pos = state.player.next_location(vec, state.ticker);
             let next_coord = next_pos.as_coord();
 
             if next_coord.x >= 0 && next_coord.x < cols && next_coord.y >= 0 && next_coord.y < rows
             {
-                state.player.set_location(next_pos, ticker);
+                state.player.set_location(next_pos, state.ticker);
 
                 render_actions.push_back(RenderAction::Move {
                     symbol: state.player.symbol(),
@@ -518,7 +301,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 });
             }
         } else {
-            state.player.charge_energy(ticker);
+            state.player.charge_energy(state.ticker);
         }
 
         // MONSTERS
@@ -528,7 +311,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         for monster_ix in (0..monsters_len).rev() {
             let mut monster = state.monsters.remove(monster_ix);
             let prev_pos = monster.coord();
-            let mut new_pos = monster.seek(state.player.location, ticker);
+            let mut new_pos = monster.seek(state.player.location, state.ticker);
             let next_coord = new_pos.as_coord();
 
             if next_coord != prev_pos {
@@ -566,14 +349,14 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     new_pos = monster.location();
                 }
             }
-            monster.set_location(new_pos, ticker);
+            monster.set_location(new_pos, state.ticker);
             state.monsters.push(monster);
         }
 
         // SPAWN MONSTERS
 
-        if state.monsters.len() < 3 && ticker.saturating_sub(last_spawn_tick) >= 5_000 {
-            let monster = Monster::new(Coord::new(4, 4), ticker, None, None);
+        if state.monsters.len() < 3 && state.ticker.saturating_sub(last_spawn_tick) >= 5_000 {
+            let monster = Monster::new(Coord::new(4, 4), state.ticker, None, None);
 
             render_actions.push_back(RenderAction::Create {
                 symbol: monster.symbol(),
@@ -583,50 +366,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
             state.monsters.push(monster);
 
-            last_spawn_tick = ticker;
+            last_spawn_tick = state.ticker;
         }
 
         // DRAWING
 
-        execute!(stdout, terminal::BeginSynchronizedUpdate)?;
-
-        queue_actions_draw(stdout, render_actions.into_iter())?;
-
-        queue_value_draw(
-            stdout,
-            display.status_indicators.get("clock"),
-            format!("{:>3}", elapsed.as_secs()),
-        )?;
-
-        queue_value_draw(
-            stdout,
-            display.status_indicators.get("score"),
-            format!("{:>3}", state.score),
-        )?;
-
-        queue_spells_draw(
-            stdout,
-            display.status_indicators.get("spells"),
-            &state.player,
-            ticker,
-        )?;
-
-        queue_value_draw(
-            stdout,
-            display.status_indicators.get("energy"),
-            format!(
-                "🧪 {:0>3} {}",
-                state.player.energy,
-                loader(
-                    state.player.energy.into(),
-                    state.player.max_energy.into(),
-                    state.player.max_energy.into()
-                )
-            ),
-        )?;
-
-        stdout.flush()?;
-        execute!(stdout, terminal::EndSynchronizedUpdate)?;
+        display.draw(stdout, &state, render_actions.into_iter())?;
 
         if state.player.coord() == Coord::new(1, 1) || exit {
             break;

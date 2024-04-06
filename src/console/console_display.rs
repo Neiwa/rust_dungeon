@@ -8,58 +8,66 @@ use crossterm::{
     style::{self, Color, Stylize},
     terminal,
 };
+use nalgebra::{vector, Point2, Scale2, Vector2};
 
 use super::{loader, loader_reverse, AsColor, AsSymbol, ConsoleUnit, Coord};
-use crate::{display::Display, player::Player, point::Point, render_action::RenderAction, State};
+use crate::{display::Display, player::Player, render_action::RenderAction, State};
 
 pub struct ConsoleDisplay<'a> {
     pub status_indicators: HashMap<&'a str, Indicator>,
-    top_left: Coord,
-    bottom_right: Coord,
-    width: u32,
-    height: u32,
-    resolution: Point,
+    top_left: Point2<u16>,
+    dimensions: Vector2<u16>,
+    resolution: Scale2<u16>,
     stdout: &'a mut io::Stdout,
     render_actions: VecDeque<RenderAction>,
 }
 
-fn bg_color(coord: Coord) -> Color {
-    let r = (2 + (coord.x * coord.y ^ 34348798) % 5) as u8;
-    let g = (100 + (coord.x * coord.y ^ 2344839) % 15) as u8;
+fn bg_color(coord: Point2<u16>) -> Color {
+    let r = (2 + (coord.x * coord.y ^ 3498) % 5) as u8;
+    let g = (100 + (coord.x * coord.y ^ 2839) % 15) as u8;
     let b = 0;
     Color::Rgb { r, g, b }
 }
 
+trait AsPoint2 {
+    fn as_point2(&self) -> Point2<u16>;
+}
+
+impl AsPoint2 for Coord {
+    fn as_point2(&self) -> Point2<u16> {
+        Point2::<u16>::new(self.x as u16, self.y as u16)
+    }
+}
+
 impl<'a> ConsoleDisplay<'a> {
     pub fn new(
-        top_left: Coord,
-        bottom_right: Coord,
-        resolution: Point,
+        top_left: Point2<u16>,
+        dimensions: Vector2<u16>,
+        resolution: Scale2<u16>,
         stdout: &'a mut io::Stdout,
     ) -> Self {
-        let top_right = Coord::new(bottom_right.x, top_left.y);
-        let bottom_left = Coord::new(top_left.x, bottom_right.y);
+        let bottom_right = top_left + dimensions;
+        let top_right = top_left + Vector2::new(dimensions.x, 0);
+        let bottom_left = top_left + Vector2::new(0, dimensions.y);
 
         Self {
             stdout,
             top_left,
-            bottom_right,
-            width: (bottom_right.x - top_left.x) as u32,
-            height: (bottom_right.y - top_left.y) as u32,
+            dimensions,
             resolution,
             status_indicators: HashMap::from([
-                ("clock", Indicator::new(top_right + Coord::new(-6, 0))),
-                ("score", Indicator::new(top_left + Coord::new(4, 0))),
-                ("spells", Indicator::new(bottom_left + Coord::new(4, 0))),
-                ("energy", Indicator::new(bottom_right + Coord::new(-9, 0))),
+                ("clock", Indicator::new(top_right - Vector2::new(6, 0))),
+                ("score", Indicator::new(top_left + Vector2::new(4, 0))),
+                ("spells", Indicator::new(bottom_left + Vector2::new(4, 0))),
+                ("energy", Indicator::new(bottom_right - Vector2::new(9, 0))),
             ]),
             render_actions: VecDeque::new(),
         }
     }
 
     fn draw_actions(&mut self) -> io::Result<()> {
-        let mut clear: HashSet<Coord> = HashSet::new();
-        let mut skip_clear: HashSet<Coord> = HashSet::new();
+        let mut clear: HashSet<Point2<u16>> = HashSet::new();
+        let mut skip_clear: HashSet<Point2<u16>> = HashSet::new();
         let mut renders = Vec::new();
 
         while let Some(render) = self.render_actions.pop_front() {
@@ -70,46 +78,48 @@ impl<'a> ConsoleDisplay<'a> {
                     symbol,
                     color,
                 } => {
-                    clear.insert(old);
-                    skip_clear.insert(new);
-                    renders.push((new, symbol, color));
+                    clear.insert(old.as_point2());
+                    skip_clear.insert(new.as_point2());
+                    renders.push((new.as_point2(), symbol, color));
                 }
                 RenderAction::Remove { coord, .. } => {
-                    clear.insert(coord);
+                    clear.insert(coord.as_point2());
                 }
                 RenderAction::Create {
                     coord,
                     symbol,
                     color,
                 } => {
-                    skip_clear.insert(coord);
-                    renders.push((coord, symbol, color));
+                    skip_clear.insert(coord.as_point2());
+                    renders.push((coord.as_point2(), symbol, color));
                 }
             };
         }
 
         for coord in clear {
             if !skip_clear.contains(&coord) {
+                let spot = self.resolution * coord
+                    + (self.top_left - Point2::new(0, 0) + Vector2::new(1, 1));
                 queue!(
                     self.stdout,
-                    cursor::MoveTo((2 * coord.x + 1) as u16, (coord.y + 1) as u16),
-                    style::PrintStyledContent(
-                        ' '.on(bg_color(Coord::new(coord.x * 2 + 1, coord.y + 1)))
-                    ),
-                    style::PrintStyledContent(
-                        ' '.on(bg_color(Coord::new(coord.x * 2 + 2, coord.y + 1)))
-                    ),
+                    cursor::MoveTo(spot.x, spot.y),
+                    style::PrintStyledContent(' '.on(bg_color(spot))),
+                    style::PrintStyledContent(' '.on(bg_color(spot + vector!(1, 0)))),
                 )?;
             }
         }
 
         for render in renders {
             match render {
-                (coord, symbol, color) => queue!(
-                    self.stdout,
-                    cursor::MoveTo((2 * coord.x + 1) as u16, (coord.y + 1) as u16),
-                    style::PrintStyledContent(symbol.with(color).on(bg_color(coord))),
-                )?,
+                (coord, symbol, color) => {
+                    let spot = self.resolution * coord
+                        + (self.top_left - Point2::new(0, 0) + Vector2::new(1, 1));
+                    queue!(
+                        self.stdout,
+                        cursor::MoveTo(spot.x, spot.y),
+                        style::PrintStyledContent(symbol.with(color).on(bg_color(spot))),
+                    )?;
+                }
             }
         }
 
@@ -161,29 +171,25 @@ impl Display for ConsoleDisplay<'_> {
     fn draw_initial(&mut self, state: &State) -> io::Result<()> {
         execute!(self.stdout, terminal::Clear(terminal::ClearType::All))?;
 
-        for y in 0..=self.height {
-            for x in 0..=self.width {
+        let (width, height) = (self.dimensions.x, self.dimensions.y);
+
+        for y in 0..=height {
+            for x in 0..=width {
                 let content = match (x, y) {
                     (0, 0) => "╔".magenta(),
-                    (0, y) if y == self.height => "╚".magenta(),
-                    (x, 0) if x == self.width => "╗".magenta(),
-                    (x, y) if x == self.width && y == self.height => "╝".magenta(),
+                    (0, y) if y == height => "╚".magenta(),
+                    (x, 0) if x == width => "╗".magenta(),
+                    (x, y) if x == width && y == height => "╝".magenta(),
                     (0, _) => "║".magenta(),
-                    (x, _) if x == self.width => "║".magenta(),
+                    (x, _) if x == width => "║".magenta(),
                     (_, 0) => "═".magenta(),
-                    (_, y) if y == self.height => "═".magenta(),
-                    _ => " ".on(bg_color(Coord::new(
-                        (x as f64 * self.resolution.x) as i32,
-                        (y as f64 * self.resolution.y) as i32,
-                    ))),
+                    (_, y) if y == height => "═".magenta(),
+                    _ => " ".on(bg_color(Point2::new(x, y))),
                 };
-
+                let spot = self.top_left + vector!(x, y);
                 queue!(
                     self.stdout,
-                    cursor::MoveTo(
-                        (self.top_left.x as u32 + x) as u16,
-                        (self.top_left.y as u32 + y) as u16
-                    ),
+                    cursor::MoveTo(spot.x, spot.y),
                     style::PrintStyledContent(content)
                 )?;
             }
@@ -236,13 +242,13 @@ impl Display for ConsoleDisplay<'_> {
 }
 
 pub struct Indicator {
-    pub coord: Coord,
+    pub coord: Point2<u16>,
     pub color: Color,
     pub bg_color: Color,
 }
 
 impl Indicator {
-    fn new(coord: Coord) -> Self {
+    fn new(coord: Point2<u16>) -> Self {
         Self {
             coord,
             color: Color::White,

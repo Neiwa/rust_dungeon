@@ -11,6 +11,7 @@ use display::Display;
 use entity::monster::Monster;
 use entity::object::Object;
 use entity::player::Player;
+use nalgebra::{Point2, Scale2, Vector2};
 use point::{AsPoint, Point};
 use render_action::RenderAction;
 
@@ -76,9 +77,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let rows = ((t_rows - 2) as i32).clamp(0, 30);
 
     let mut display = ConsoleDisplay::new(
-        Coord::new(0, 0),
-        Coord::new(cols * 2 + 1, rows + 1),
-        Point::new(2.0, 1.0),
+        Point2::new(0, 0),
+        Vector2::new((cols * 2 + 1) as u16, (rows + 1) as u16),
+        Scale2::new(2, 1),
         stdout,
     );
 

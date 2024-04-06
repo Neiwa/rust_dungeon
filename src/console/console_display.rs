@@ -35,7 +35,10 @@ trait AsPoint2 {
 
 impl AsPoint2 for Point2<f64> {
     fn as_point2(&self) -> Point2<u16> {
-        Point2::<u16>::new(self.x as u16, self.y as u16)
+        Point2::<u16>::new(
+            self.x.round().clamp(u16::MIN.into(), u16::MAX.into()) as u16,
+            self.y.round().clamp(u16::MIN.into(), u16::MAX.into()) as u16,
+        )
     }
 }
 

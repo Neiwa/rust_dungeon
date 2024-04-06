@@ -9,7 +9,6 @@ use crate::{
 pub struct FireballObject {
     pub location: Point2<f64>,
     pub vector: Vector2<f64>,
-    pub speed: f64,
     last_tick: u128,
 }
 
@@ -18,7 +17,6 @@ impl FireballObject {
         Self {
             location,
             vector: vector.normalize() * 0.01,
-            speed: 0.01,
             last_tick: ticker,
         }
     }
@@ -31,10 +29,6 @@ impl Object for FireballObject {
 
     fn vector(&self) -> Vector2<f64> {
         self.vector
-    }
-
-    fn speed(&self) -> f64 {
-        self.speed
     }
 
     fn set_location(&mut self, location: Point2<f64>, ticker: u128) {

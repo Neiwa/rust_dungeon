@@ -21,10 +21,6 @@ impl AsCoord for Direction {
     }
 }
 
-pub trait AsDirection {
-    fn as_direction(self) -> Option<Direction>;
-}
-
 impl ops::Add<Direction> for Coord {
     type Output = Coord;
 

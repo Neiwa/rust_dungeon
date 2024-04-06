@@ -1,6 +1,7 @@
 use command::{AsCommand, Command};
 use console::{
-    loader, loader_reverse, AsColor, AsCoord, AsSymbol, ConsoleUnit, Coord, InputTracker,
+    loader, loader_reverse, AsColor, AsCoord, AsSymbol, ConsoleUnit, Coord, Display, Indicator,
+    InputTracker,
 };
 use crossterm::{
     cursor,
@@ -19,7 +20,7 @@ use render_action::RenderAction;
 use std::collections::HashSet;
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     fs::File,
     io::{self, Write},
     time::{Duration, Instant},
@@ -39,16 +40,6 @@ struct State {
     monsters: Vec<Monster>,
     player: Player,
     objects: Vec<Box<dyn Object>>,
-}
-
-struct Display<'a> {
-    status_indicators: HashMap<&'a str, Indicator>,
-}
-
-struct Indicator {
-    coord: Coord,
-    color: Color,
-    bg_color: Color,
 }
 
 fn bg_color(_coord: Coord) -> Color {
@@ -275,42 +266,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         objects: Vec::new(),
     };
 
-    let display = Display {
-        status_indicators: HashMap::from([
-            (
-                "clock",
-                Indicator {
-                    coord: Coord::new((2 * cols - 7).into(), 0),
-                    color: Color::White,
-                    bg_color: Color::Magenta,
-                },
-            ),
-            (
-                "score",
-                Indicator {
-                    coord: Coord::new(5, 0),
-                    color: Color::White,
-                    bg_color: Color::Magenta,
-                },
-            ),
-            (
-                "spells",
-                Indicator {
-                    coord: Coord::new(5, rows as i32 + 1),
-                    color: Color::White,
-                    bg_color: Color::Magenta,
-                },
-            ),
-            (
-                "energy",
-                Indicator {
-                    coord: Coord::new((2 * cols - 10).into(), rows as i32 + 1),
-                    color: Color::White,
-                    bg_color: Color::Magenta,
-                },
-            ),
-        ]),
-    };
+    let display = Display::new(
+        Coord::new(0, 0),
+        Coord::new(cols * 2 + 1, rows + 1),
+        Point::new(2.0, 1.0),
+    );
 
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     for y in 0..rows + 2 {

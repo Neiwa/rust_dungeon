@@ -41,9 +41,9 @@ impl Indicator {
 }
 
 fn bg_color(coord: Point2<u16>) -> Color {
-    let r = (2 + (coord.x * coord.y ^ 3498) % 5) as u8;
-    let g = (100 + (coord.x * coord.y ^ 2839) % 15) as u8;
-    let b = 0;
+    let r = (2 + (coord.x.wrapping_add(16).wrapping_mul(coord.y) ^ 0b1010101010101010) % 5) as u8;
+    let g = (100 + (coord.x.wrapping_mul(coord.y.wrapping_add(4)) ^ 0b0101010101010101) % 15) as u8;
+    let b = 2;
     Color::Rgb { r, g, b }
 }
 

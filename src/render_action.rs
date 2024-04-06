@@ -2,6 +2,7 @@ use crossterm::style::Color;
 
 use crate::Coord;
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RenderAction {
     Move {
         symbol: char,

@@ -14,7 +14,6 @@ use point::{AsPoint, Point};
 use render_action::RenderAction;
 
 use std::{
-    collections::VecDeque,
     fs::File,
     io::{self, Write},
     time::{Duration, Instant},
@@ -75,6 +74,13 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let cols = (((t_cols - 2) / 2) as i32).clamp(0, 30);
     let rows = ((t_rows - 2) as i32).clamp(0, 30);
 
+    let mut display = Display::new(
+        Coord::new(0, 0),
+        Coord::new(cols * 2 + 1, rows + 1),
+        Point::new(2.0, 1.0),
+        stdout,
+    );
+
     let mut state = State {
         start: Instant::now(),
         ticker: 0,
@@ -107,13 +113,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         objects: Vec::new(),
     };
 
-    let display = Display::new(
-        Coord::new(0, 0),
-        Coord::new(cols * 2 + 1, rows + 1),
-        Point::new(2.0, 1.0),
-    );
-
-    display.draw_initial(stdout, &state)?;
+    display.draw_initial(&state)?;
 
     let mut last_spawn_tick = 0;
 
@@ -140,8 +140,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
         state.ticker = state.start.elapsed().as_millis();
 
-        let mut render_actions: VecDeque<RenderAction> = VecDeque::new();
-
         // OBJECTS
 
         let object_len = state.objects.len();
@@ -167,11 +165,11 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                             state.score += 1;
 
                             let monster = state.monsters.remove(monster_ix);
-                            render_actions.push_back(RenderAction::Remove {
+                            display.enqueue_action(RenderAction::Remove {
                                 coord: monster.coord(),
                                 symbol: monster.symbol(),
                             });
-                            render_actions.push_back(RenderAction::Remove {
+                            display.enqueue_action(RenderAction::Remove {
                                 coord: object.coord(),
                                 symbol: object.symbol(),
                             });
@@ -183,7 +181,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     if !hit {
                         object.set_location(new_pos, state.ticker);
 
-                        render_actions.push_back(RenderAction::Move {
+                        display.enqueue_action(RenderAction::Move {
                             symbol: object.symbol(),
                             color: object.color(),
                             old: prev_coord,
@@ -192,7 +190,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         state.objects.push(object);
                     }
                 } else {
-                    render_actions.push_back(RenderAction::Remove {
+                    display.enqueue_action(RenderAction::Remove {
                         coord: prev_coord,
                         symbol: object.symbol(),
                     });
@@ -229,7 +227,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                                 && object_coord.y >= 0
                                 && object_coord.y < rows
                             {
-                                render_actions.push_back(RenderAction::Create {
+                                display.enqueue_action(RenderAction::Create {
                                     symbol: object.symbol(),
                                     color: object.color(),
                                     coord: object_coord,
@@ -255,7 +253,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                                 && object_coord.y >= 0
                                 && object_coord.y < rows
                             {
-                                render_actions.push_back(RenderAction::Create {
+                                display.enqueue_action(RenderAction::Create {
                                     symbol: object.symbol(),
                                     color: object.color(),
                                     coord: object_coord,
@@ -293,7 +291,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             {
                 state.player.set_location(next_pos, state.ticker);
 
-                render_actions.push_back(RenderAction::Move {
+                display.enqueue_action(RenderAction::Move {
                     symbol: state.player.symbol(),
                     color: state.player.color(),
                     old: prev_pos,
@@ -339,7 +337,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 }
 
                 if !collision {
-                    render_actions.push_back(RenderAction::Move {
+                    display.enqueue_action(RenderAction::Move {
                         symbol: monster.symbol(),
                         color: monster.color(),
                         old: prev_pos,
@@ -358,7 +356,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         if state.monsters.len() < 3 && state.ticker.saturating_sub(last_spawn_tick) >= 5_000 {
             let monster = Monster::new(Coord::new(4, 4), state.ticker, None, None);
 
-            render_actions.push_back(RenderAction::Create {
+            display.enqueue_action(RenderAction::Create {
                 symbol: monster.symbol(),
                 color: monster.color(),
                 coord: monster.coord(),
@@ -370,8 +368,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         }
 
         // DRAWING
-
-        display.draw(stdout, &state, render_actions.into_iter())?;
+        display.draw(&state)?;
 
         if state.player.coord() == Coord::new(1, 1) || exit {
             break;

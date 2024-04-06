@@ -13,7 +13,7 @@ pub use self::as_symbol::AsSymbol;
 pub use self::console_unit::ConsoleUnit;
 pub use self::coord::{AsCoord, Coord};
 pub use self::direction::Direction;
-pub use self::display::{Display, Indicator};
+pub use self::display::Display;
 pub use self::input_tracker::InputTracker;
 
 const LOADING_SYMBOLS: [char; 9] = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];

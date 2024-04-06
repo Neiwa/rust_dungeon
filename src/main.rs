@@ -1,5 +1,5 @@
 use command::{AsCommand, Command};
-use console::{AsVector2, ConsoleDisplay, ConsoleUnit, InputTracker};
+use console::{ConsoleDisplay, ConsoleUnit, InputTracker};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent, KeyEventKind},
@@ -7,6 +7,7 @@ use crossterm::{
     terminal::{self, size, SetSize},
 };
 
+use direction::AsVector2;
 use display::Display;
 use entity::monster::Monster;
 use entity::object::Object;
@@ -24,6 +25,7 @@ use std::{
 
 mod command;
 mod console;
+mod direction;
 mod display;
 mod entity;
 mod magic;
@@ -180,6 +182,10 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 _ => {}
             }
         }
+        if exit {
+            break;
+        }
+
         if pause.is_some() {
             continue;
         }

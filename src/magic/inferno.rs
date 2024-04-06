@@ -1,7 +1,7 @@
 use nalgebra::{Point2, Vector2};
 
 use crate::{
-    console::{AsVector2, Direction},
+    direction::{AsVector2, Direction},
     magic::fireball::FireballObject,
     Object,
 };

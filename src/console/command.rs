@@ -1,11 +1,11 @@
 use crossterm::event::KeyCode;
 
-use crate::command::{AsCommand, Command};
-
-use super::{
-    input::{Input, InputState},
-    Direction,
+use crate::{
+    command::{AsCommand, Command},
+    direction::Direction,
 };
+
+use super::input::{Input, InputState};
 
 impl AsCommand for InputState {
     fn as_command(&self) -> Option<Command> {

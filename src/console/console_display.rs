@@ -21,6 +21,7 @@ pub struct ConsoleDisplay<'a> {
     resolution: Scale2<u16>,
     stdout: &'a mut io::Stdout,
     render_actions: VecDeque<RenderAction>,
+    game_area_offset: Vector2<u16>,
 }
 
 pub struct Indicator {
@@ -82,6 +83,7 @@ impl<'a> ConsoleDisplay<'a> {
                 ("energy", Indicator::new(bottom_right - Vector2::new(9, 0))),
             ]),
             render_actions: VecDeque::new(),
+            game_area_offset: top_left - Point2::new(0, 0) + Vector2::new(1, 1),
         }
     }
 
@@ -118,8 +120,7 @@ impl<'a> ConsoleDisplay<'a> {
 
         for coord in clear {
             if !skip_clear.contains(&coord) {
-                let spot = self.resolution * coord
-                    + (self.top_left - Point2::new(0, 0) + Vector2::new(1, 1));
+                let spot = self.resolution * coord + self.game_area_offset;
                 execute!(
                     self.stdout,
                     cursor::MoveTo(spot.x, spot.y),
@@ -132,8 +133,7 @@ impl<'a> ConsoleDisplay<'a> {
         for render in renders {
             match render {
                 (coord, symbol, color) => {
-                    let spot = self.resolution * coord
-                        + (self.top_left - Point2::new(0, 0) + Vector2::new(1, 1));
+                    let spot = self.resolution * coord + self.game_area_offset;
                     execute!(
                         self.stdout,
                         cursor::MoveTo(spot.x, spot.y),

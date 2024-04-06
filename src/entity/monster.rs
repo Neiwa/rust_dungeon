@@ -2,7 +2,7 @@ use nalgebra::{vector, Point2};
 use rand::rngs::StdRng;
 use rand::{random, Rng, SeedableRng};
 
-use crate::console::{AsVector2, Direction};
+use crate::direction::{AsVector2, Direction};
 
 use super::*;
 

@@ -1,4 +1,4 @@
-use crate::console::Direction;
+use crate::direction::Direction;
 
 pub enum Command {
     Move(Direction),

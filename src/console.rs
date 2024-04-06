@@ -3,7 +3,6 @@ mod as_symbol;
 mod command;
 mod console_display;
 mod console_unit;
-mod direction;
 mod input;
 mod input_tracker;
 
@@ -11,7 +10,6 @@ pub use self::as_color::AsColor;
 pub use self::as_symbol::AsSymbol;
 pub use self::console_display::ConsoleDisplay;
 pub use self::console_unit::ConsoleUnit;
-pub use self::direction::{AsVector2, Direction};
 pub use self::input_tracker::InputTracker;
 
 const LOADING_SYMBOLS: [char; 9] = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];

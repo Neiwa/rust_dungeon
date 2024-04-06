@@ -1,12 +1,13 @@
+use nalgebra::{Point2, Vector2};
+
 use crate::{
     magic::{fireball::FireballMagic, inferno::InfernoMagic, sphere::SphereMagic, Magic},
     object::Object,
-    point::Point,
-    Coord, Entity, Unit,
+    Entity, Unit,
 };
 
 pub struct Player {
-    pub location: Point,
+    pub location: Point2<f64>,
     pub energy: u32,
     pub max_energy: u32,
     pub spells: Vec<Box<dyn Magic>>,
@@ -18,9 +19,9 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(coord: Coord, ticker: u128) -> Self {
+    pub fn new(location: Point2<f64>, ticker: u128) -> Self {
         Self {
-            location: Point::new(coord.x as f64, coord.y as f64),
+            location,
             energy: 100,
             max_energy: 100,
             spells: vec![
@@ -41,7 +42,11 @@ impl Player {
         self.spells.get(self.active_spell).unwrap()
     }
 
-    pub fn active_spell_evoke(&mut self, direction: Point, ticker: u128) -> Vec<Box<dyn Object>> {
+    pub fn active_spell_evoke(
+        &mut self,
+        direction: Vector2<f64>,
+        ticker: u128,
+    ) -> Vec<Box<dyn Object>> {
         let spell = &mut self.spells[self.active_spell];
         self.energy -= spell.cost();
         self.last_action_tick = ticker;
@@ -53,9 +58,10 @@ impl Player {
             && self.energy >= self.spells[self.active_spell].cost()
     }
 
-    pub fn next_location(&self, vector: Point, ticker: u128) -> Point {
+    pub fn next_location(&self, vector: Vector2<f64>, ticker: u128) -> Point2<f64> {
         self.location
-            + vector.normalize(self.speed() / 1000.0) * ticker.saturating_sub(self.last_tick)
+            + vector.normalize() * self.speed() / 1000.0
+                * ticker.saturating_sub(self.last_tick) as f64
     }
 
     pub fn set_ticker(&mut self, ticker: u128) {
@@ -84,7 +90,7 @@ impl Unit for Player {
         5.0
     }
 
-    fn set_location(&mut self, location: Point, ticker: u128) {
+    fn set_location(&mut self, location: Point2<f64>, ticker: u128) {
         self.location = location;
         self.last_tick = ticker;
         self.last_action_tick = ticker;
@@ -92,7 +98,7 @@ impl Unit for Player {
 }
 
 impl Entity for Player {
-    fn location(&self) -> Point {
+    fn location(&self) -> Point2<f64> {
         self.location
     }
 }

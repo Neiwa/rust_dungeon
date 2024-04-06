@@ -1,5 +1,5 @@
 use command::{AsCommand, Command};
-use console::{AsCoord, ConsoleDisplay, ConsoleUnit, Coord, InputTracker};
+use console::{AsVector2, ConsoleDisplay, ConsoleUnit, InputTracker};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -12,7 +12,6 @@ use entity::monster::Monster;
 use entity::object::Object;
 use entity::player::Player;
 use nalgebra::{Point2, Scale2, Vector2};
-use point::{AsPoint, Point};
 use render_action::RenderAction;
 
 use std::{
@@ -26,7 +25,6 @@ mod console;
 mod display;
 mod entity;
 mod magic;
-pub mod point;
 mod render_action;
 use crate::entity::*;
 
@@ -36,6 +34,16 @@ struct State {
     monsters: Vec<Monster>,
     player: Player,
     objects: Vec<Box<dyn Object>>,
+}
+
+trait AsCoord {
+    fn as_coord(&self) -> Point2<i32>;
+}
+
+impl AsCoord for Point2<f64> {
+    fn as_coord(&self) -> Point2<i32> {
+        Point2::new(self.x as i32, self.y as i32)
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -88,26 +96,26 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut state = State {
         ticker: 0,
         score: 0,
-        player: Player::new(Coord::new(cols as i32 / 2, rows as i32 / 2), 0),
+        player: Player::new(Point2::new(cols as f64 / 2.0, rows as f64 / 2.0), 0),
         monsters: vec![
-            Monster::new_simple(Coord::new(cols as i32 / 4, rows as i32 / 4), 0),
+            Monster::new_simple(Point2::new(cols as f64 / 4.0, rows as f64 / 4.0), 0),
             Monster::new(
-                Coord::new(cols as i32 / 4 + cols as i32 / 2, rows as i32 / 4),
+                Point2::new(cols as f64 / 4.0 + cols as f64 / 2.0, rows as f64 / 4.0),
                 0,
                 Some(40),
                 Some(3.0),
             ),
             Monster::new(
-                Coord::new(
-                    cols as i32 / 4 + cols as i32 / 2,
-                    rows as i32 / 4 + rows as i32 / 2,
+                Point2::new(
+                    cols as f64 / 4.0 + cols as f64 / 2.0,
+                    rows as f64 / 4.0 + rows as f64 / 2.0,
                 ),
                 0,
                 Some(150),
                 None,
             ),
             Monster::new(
-                Coord::new(cols as i32 / 4, rows as i32 / 4 + rows as i32 / 2),
+                Point2::new(cols as f64 / 4.0, rows as f64 / 4.0 + rows as f64 / 2.0),
                 0,
                 Some(200),
                 None,
@@ -149,12 +157,13 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         for object_ix in (0..object_len).rev() {
             let object = &state.objects[object_ix];
-            let prev_coord = object.location().as_coord();
+            let old_pos = object.location();
             let new_pos = object.next_location(state.ticker);
 
+            let old_coord = old_pos.as_coord();
             let next_coord = new_pos.as_coord();
 
-            if prev_coord != next_coord {
+            if old_coord != next_coord {
                 let mut object = state.objects.remove(object_ix);
                 if next_coord.x >= 0
                     && next_coord.x < cols
@@ -164,16 +173,16 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     let mut hit = false;
 
                     for monster_ix in 0..state.monsters.len() {
-                        if state.monsters[monster_ix].coord() == next_coord {
+                        if state.monsters[monster_ix].location().as_coord() == next_coord {
                             state.score += 1;
 
                             let monster = state.monsters.remove(monster_ix);
                             display.enqueue_action(RenderAction::Remove {
-                                coord: monster.coord(),
+                                coord: monster.location(),
                                 symbol: monster.symbol(),
                             });
                             display.enqueue_action(RenderAction::Remove {
-                                coord: object.coord(),
+                                coord: object.location(),
                                 symbol: object.symbol(),
                             });
                             hit = true;
@@ -187,14 +196,14 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         display.enqueue_action(RenderAction::Move {
                             symbol: object.symbol(),
                             color: object.color(),
-                            old: prev_coord,
-                            new: next_coord,
+                            old: old_pos,
+                            new: new_pos,
                         });
                         state.objects.push(object);
                     }
                 } else {
                     display.enqueue_action(RenderAction::Remove {
-                        coord: prev_coord,
+                        coord: old_pos,
                         symbol: object.symbol(),
                     });
                 }
@@ -204,36 +213,36 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         // PLAYER
 
         let (input_state, cursor_coord) = input_tracker.calculate_state();
-        let mouse_coord = Coord::new(
+        let mouse_coord = Point2::new(
             (cursor_coord.x.saturating_sub(1) / 2).into(),
             cursor_coord.y.saturating_sub(1).into(),
         );
 
-        let mut step: Option<Point> = None;
+        let mut step: Vector2<f64> = Vector2::zeros();
 
         for key_state in input_state {
             match key_state.as_command() {
                 Some(Command::Move(direction)) => {
-                    step = step + direction.as_point();
+                    step = step + direction.as_vector();
                 }
                 Some(Command::Evoke(direction)) => {
                     if state.player.active_spell_can_evoke(state.ticker) {
                         let mut objects = state
                             .player
-                            .active_spell_evoke(direction.as_point(), state.ticker);
+                            .active_spell_evoke(direction.as_vector(), state.ticker);
 
                         while let Some(object) = objects.pop() {
-                            let object_coord = object.location().as_coord();
+                            let location = object.location();
 
-                            if object_coord.x >= 0
-                                && object_coord.x < cols
-                                && object_coord.y >= 0
-                                && object_coord.y < rows
+                            if location.x >= 0.0
+                                && location.x < cols as f64
+                                && location.y >= 0.0
+                                && location.y < rows as f64
                             {
                                 display.enqueue_action(RenderAction::Create {
                                     symbol: object.symbol(),
                                     color: object.color(),
-                                    coord: object_coord,
+                                    location,
                                 });
 
                                 state.objects.push(object);
@@ -244,22 +253,22 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 Some(Command::EvokeMouse) => {
                     if state.player.active_spell_can_evoke(state.ticker) {
                         let mut objects = state.player.active_spell_evoke(
-                            (mouse_coord.as_point() - state.player.location).normalize(1.0),
+                            (mouse_coord - state.player.location).normalize(),
                             state.ticker,
                         );
 
                         while let Some(object) = objects.pop() {
-                            let object_coord = object.location().as_coord();
+                            let location = object.location();
 
-                            if object_coord.x >= 0
-                                && object_coord.x < cols
-                                && object_coord.y >= 0
-                                && object_coord.y < rows
+                            if location.x >= 0.0
+                                && location.x < cols as f64
+                                && location.y >= 0.0
+                                && location.y < rows as f64
                             {
                                 display.enqueue_action(RenderAction::Create {
                                     symbol: object.symbol(),
                                     color: object.color(),
-                                    coord: object_coord,
+                                    location,
                                 });
 
                                 state.objects.push(object);
@@ -285,12 +294,14 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             }
         }
 
-        if let Some(vec) = step {
-            let prev_pos = state.player.location.as_coord();
-            let next_pos = state.player.next_location(vec, state.ticker);
-            let next_coord = next_pos.as_coord();
+        if step != Vector2::zeros() {
+            let prev_pos = state.player.location();
+            let next_pos = state.player.next_location(step, state.ticker);
 
-            if next_coord.x >= 0 && next_coord.x < cols && next_coord.y >= 0 && next_coord.y < rows
+            if next_pos.x >= 0.0
+                && next_pos.x < cols as f64
+                && next_pos.y >= 0.0
+                && next_pos.y < rows as f64
             {
                 state.player.set_location(next_pos, state.ticker);
 
@@ -298,7 +309,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     symbol: state.player.symbol(),
                     color: state.player.color(),
                     old: prev_pos,
-                    new: state.player.coord(),
+                    new: state.player.location(),
                 });
             }
         } else {
@@ -311,11 +322,13 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         for monster_ix in (0..monsters_len).rev() {
             let mut monster = state.monsters.remove(monster_ix);
-            let prev_pos = monster.coord();
+            let old_pos = monster.location();
             let mut new_pos = monster.seek(state.player.location, state.ticker);
+
+            let old_coord = old_pos.as_coord();
             let next_coord = new_pos.as_coord();
 
-            if next_coord != prev_pos {
+            if next_coord != old_coord {
                 let mut collision = false;
                 if next_coord.x >= 0
                     && next_coord.x < cols
@@ -324,13 +337,13 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                 {
                     for other_ix in 0..(monsters_len - 1) {
                         let other_monster = &state.monsters[other_ix];
-                        if other_monster.coord() == next_coord {
+                        if other_monster.location().as_coord() == next_coord {
                             collision = true;
                             break;
                         }
                     }
 
-                    if monster.coord() == state.player.coord() {
+                    if monster.location().as_coord() == state.player.location().as_coord() {
                         state.score = 0;
                         exit = true;
                         break;
@@ -343,8 +356,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                     display.enqueue_action(RenderAction::Move {
                         symbol: monster.symbol(),
                         color: monster.color(),
-                        old: prev_pos,
-                        new: next_coord,
+                        old: old_pos,
+                        new: new_pos,
                     });
                 } else {
                     new_pos = monster.location();
@@ -357,12 +370,12 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         // SPAWN MONSTERS
 
         if state.monsters.len() < 3 && state.ticker.saturating_sub(last_spawn_tick) >= 5_000 {
-            let monster = Monster::new(Coord::new(4, 4), state.ticker, None, None);
+            let monster = Monster::new(Point2::new(4.0, 4.0), state.ticker, None, None);
 
             display.enqueue_action(RenderAction::Create {
                 symbol: monster.symbol(),
                 color: monster.color(),
-                coord: monster.coord(),
+                location: monster.location(),
             });
 
             state.monsters.push(monster);
@@ -373,7 +386,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         // DRAWING
         display.draw(&state)?;
 
-        if state.player.coord() == Coord::new(1, 1) || exit {
+        if state.player.location().as_coord() == Point2::<i32>::new(1, 1) || exit {
             break;
         }
     }

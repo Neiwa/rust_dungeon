@@ -10,8 +10,8 @@ use crossterm::{
 };
 use nalgebra::{vector, Point2, Scale2, Vector2};
 
-use super::{loader, loader_reverse, AsColor, AsSymbol, ConsoleUnit, Coord};
-use crate::{display::Display, player::Player, render_action::RenderAction, State};
+use super::{loader, loader_reverse, AsColor, AsSymbol, ConsoleUnit};
+use crate::{display::Display, player::Player, render_action::RenderAction, Entity, State};
 
 pub struct ConsoleDisplay<'a> {
     pub status_indicators: HashMap<&'a str, Indicator>,
@@ -33,7 +33,7 @@ trait AsPoint2 {
     fn as_point2(&self) -> Point2<u16>;
 }
 
-impl AsPoint2 for Coord {
+impl AsPoint2 for Point2<f64> {
     fn as_point2(&self) -> Point2<u16> {
         Point2::<u16>::new(self.x as u16, self.y as u16)
     }
@@ -86,7 +86,7 @@ impl<'a> ConsoleDisplay<'a> {
                     clear.insert(coord.as_point2());
                 }
                 RenderAction::Create {
-                    coord,
+                    location: coord,
                     symbol,
                     color,
                 } => {
@@ -201,18 +201,18 @@ impl Display for ConsoleDisplay<'_> {
             .map(|m| RenderAction::Create {
                 symbol: m.symbol(),
                 color: m.color(),
-                coord: m.coord(),
+                location: m.location(),
             })
             .chain([
                 RenderAction::Create {
                     symbol: state.player.symbol(),
                     color: state.player.color(),
-                    coord: state.player.coord(),
+                    location: state.player.location(),
                 },
                 RenderAction::Create {
                     symbol: '🚪',
                     color: Color::White,
-                    coord: Coord::new(1, 1),
+                    location: Point2::new(1.0, 1.0),
                 },
             ]);
 

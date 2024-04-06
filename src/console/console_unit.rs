@@ -2,12 +2,11 @@ use crossterm::style::Color;
 
 use crate::{monster::Monster, object::Object, player::Player};
 
-use super::{AsColor, AsCoord, AsSymbol, Coord};
+use super::{AsColor, AsSymbol};
 
 pub trait ConsoleUnit {
     fn color(&self) -> Color;
     fn symbol(&self) -> char;
-    fn coord(&self) -> Coord;
 }
 
 impl ConsoleUnit for Player {
@@ -17,10 +16,6 @@ impl ConsoleUnit for Player {
 
     fn symbol(&self) -> char {
         '🧙'
-    }
-
-    fn coord(&self) -> Coord {
-        self.location.as_coord()
     }
 }
 
@@ -55,10 +50,6 @@ impl ConsoleUnit for Monster {
         // let symbols = ['W', 'X', 'Y'];
         SYMBOLS[(self.id % SYMBOLS.len() as u64) as usize]
     }
-
-    fn coord(&self) -> Coord {
-        self.location.as_coord()
-    }
 }
 
 impl ConsoleUnit for dyn Object {
@@ -68,9 +59,5 @@ impl ConsoleUnit for dyn Object {
 
     fn symbol(&self) -> char {
         self.get_spell().as_symbol()
-    }
-
-    fn coord(&self) -> Coord {
-        self.location().as_coord()
     }
 }

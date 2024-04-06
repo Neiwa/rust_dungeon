@@ -1,22 +1,21 @@
 use crossterm::style::Color;
+use nalgebra::Point2;
 
-use crate::Coord;
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RenderAction {
     Move {
         symbol: char,
         color: Color,
-        old: Coord,
-        new: Coord,
+        old: Point2<f64>,
+        new: Point2<f64>,
     },
     Remove {
-        coord: Coord,
+        coord: Point2<f64>,
         symbol: char,
     },
     Create {
         symbol: char,
         color: Color,
-        coord: Coord,
+        location: Point2<f64>,
     },
 }

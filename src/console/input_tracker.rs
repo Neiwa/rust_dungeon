@@ -1,26 +1,25 @@
 use std::collections::{HashSet, VecDeque};
 
 use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
-
-use crate::Coord;
+use nalgebra::Point2;
 
 use super::input::*;
 
 pub struct InputTracker {
     pressed_keys: HashSet<KeyCode>,
     pressed_mouse_buttons: HashSet<MouseButton>,
-    mouse_coord: Coord,
+    mouse_coord: Point2<u16>,
     current_events: VecDeque<Event>,
     current_state: HashSet<InputState>,
-    current_mouse_coord: Coord,
+    current_mouse_coord: Point2<u16>,
 }
 
 impl InputTracker {
     pub fn new() -> Self {
-        Self::new_mouse(Coord::new(0, 0))
+        Self::new_mouse(Point2::new(0, 0))
     }
 
-    pub fn new_mouse(mouse_location: Coord) -> Self {
+    pub fn new_mouse(mouse_location: Point2<u16>) -> Self {
         Self {
             pressed_keys: HashSet::new(),
             pressed_mouse_buttons: HashSet::new(),
@@ -40,7 +39,7 @@ impl InputTracker {
         }
     }
 
-    pub fn calculate_state(&mut self) -> (&HashSet<InputState>, &Coord) {
+    pub fn calculate_state(&mut self) -> (&HashSet<InputState>, &Point2<u16>) {
         let mut new_state: HashSet<InputState> = HashSet::new();
         let mut still_active_keys = self.pressed_keys.clone();
         let mut still_active_mouse = self.pressed_mouse_buttons.clone();
@@ -64,7 +63,7 @@ impl InputTracker {
                 },
                 Event::Mouse(mouse_event) => {
                     self.mouse_coord =
-                        Coord::new(mouse_event.column.into(), mouse_event.row.into());
+                        Point2::new(mouse_event.column.into(), mouse_event.row.into());
 
                     if let Some(input) = mouse_event.kind.as_input() {
                         match mouse_event.kind {

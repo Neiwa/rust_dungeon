@@ -1,6 +1,4 @@
-use std::ops;
-
-use crate::{AsCoord, Coord};
+use nalgebra::{vector, Vector2};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Direction {
@@ -10,29 +8,17 @@ pub enum Direction {
     Right,
 }
 
-impl AsCoord for Direction {
-    fn as_coord(&self) -> Coord {
+pub trait AsVector2 {
+    fn as_vector(&self) -> Vector2<f64>;
+}
+
+impl AsVector2 for Direction {
+    fn as_vector(&self) -> Vector2<f64> {
         match self {
-            Self::Up => Coord::new(0, -1),
-            Self::Down => Coord::new(0, 1),
-            Self::Left => Coord::new(-1, 0),
-            Self::Right => Coord::new(1, 0),
+            Direction::Up => vector![0.0, -1.0],
+            Direction::Down => vector![0.0, 1.0],
+            Direction::Left => vector![-1.0, 0.0],
+            Direction::Right => vector![1.0, 0.0],
         }
-    }
-}
-
-impl ops::Add<Direction> for Coord {
-    type Output = Coord;
-
-    fn add(self, rhs: Direction) -> Self::Output {
-        self + rhs.as_coord()
-    }
-}
-
-impl ops::AddAssign<Direction> for Coord {
-    fn add_assign(&mut self, rhs: Direction) {
-        let coord = rhs.as_coord();
-        self.x += coord.x;
-        self.y += coord.y;
     }
 }

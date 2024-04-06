@@ -22,6 +22,22 @@ pub struct ConsoleDisplay<'a> {
     render_actions: VecDeque<RenderAction>,
 }
 
+pub struct Indicator {
+    pub coord: Point2<u16>,
+    pub color: Color,
+    pub bg_color: Color,
+}
+
+impl Indicator {
+    fn new(coord: Point2<u16>) -> Self {
+        Self {
+            coord,
+            color: Color::White,
+            bg_color: Color::Magenta,
+        }
+    }
+}
+
 fn bg_color(coord: Point2<u16>) -> Color {
     let r = (2 + (coord.x * coord.y ^ 3498) % 5) as u8;
     let g = (100 + (coord.x * coord.y ^ 2839) % 15) as u8;
@@ -35,7 +51,7 @@ trait AsPoint2 {
 
 impl AsPoint2 for Point2<f64> {
     fn as_point2(&self) -> Point2<u16> {
-        Point2::<u16>::new(
+        Point2::new(
             self.x.round().clamp(u16::MIN.into(), u16::MAX.into()) as u16,
             self.y.round().clamp(u16::MIN.into(), u16::MAX.into()) as u16,
         )
@@ -107,7 +123,7 @@ impl<'a> ConsoleDisplay<'a> {
                     self.stdout,
                     cursor::MoveTo(spot.x, spot.y),
                     style::PrintStyledContent(' '.on(bg_color(spot))),
-                    style::PrintStyledContent(' '.on(bg_color(spot + vector!(1, 0)))),
+                    style::PrintStyledContent(' '.on(bg_color(spot + vector![1, 0]))),
                 )?;
             }
         }
@@ -223,6 +239,8 @@ impl Display for ConsoleDisplay<'_> {
             self.enqueue_action(action);
         }
 
+        self.draw_actions()?;
+
         self.draw_state(state)?;
 
         self.stdout.flush()?;
@@ -244,22 +262,6 @@ impl Display for ConsoleDisplay<'_> {
     }
 }
 
-pub struct Indicator {
-    pub coord: Point2<u16>,
-    pub color: Color,
-    pub bg_color: Color,
-}
-
-impl Indicator {
-    fn new(coord: Point2<u16>) -> Self {
-        Self {
-            coord,
-            color: Color::White,
-            bg_color: Color::Magenta,
-        }
-    }
-}
-
 fn queue_value_draw(
     stdout: &mut io::Stdout,
     indicator: Option<&Indicator>,
@@ -273,7 +275,7 @@ fn queue_value_draw(
 
     queue!(
         stdout,
-        cursor::MoveTo(ind.coord.x as u16, ind.coord.y as u16),
+        cursor::MoveTo(ind.coord.x, ind.coord.y),
         style::PrintStyledContent(value.with(ind.color).on(ind.bg_color)),
     )?;
 
@@ -292,10 +294,7 @@ fn queue_spells_draw(
 
     let ind = indicator.unwrap();
 
-    queue!(
-        stdout,
-        cursor::MoveTo(ind.coord.x as u16, ind.coord.y as u16)
-    )?;
+    queue!(stdout, cursor::MoveTo(ind.coord.x, ind.coord.y))?;
 
     let spell_len = player.spells.len();
     for i in 0..spell_len {

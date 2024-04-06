@@ -1,6 +1,6 @@
 use std::ops;
 
-use crate::Direction;
+use crate::console::Direction;
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
 pub struct Point {

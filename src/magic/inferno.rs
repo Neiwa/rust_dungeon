@@ -1,7 +1,8 @@
 use crate::{
+    console::Direction,
     magic::fireball::FireballObject,
     point::{AsPoint, Point},
-    Direction, Object,
+    Object,
 };
 
 use super::{Magic, Spell};

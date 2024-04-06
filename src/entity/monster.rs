@@ -2,9 +2,10 @@ use rand::rngs::StdRng;
 use rand::{random, Rng, SeedableRng};
 
 use super::*;
+use crate::console::Direction;
 use crate::{
     point::{AsPoint, Point},
-    Coord, Direction,
+    Coord,
 };
 
 pub struct Monster {

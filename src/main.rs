@@ -1,7 +1,7 @@
 use command::{AsCommand, Command};
-use console::coord::AsDirection;
-use console::input_tracker::InputTracker;
-use console::{loader, AsSymbol, ConsoleUnit};
+use console::{
+    loader, loader_reverse, AsColor, AsCoord, AsSymbol, ConsoleUnit, Coord, InputTracker,
+};
 use crossterm::{
     cursor,
     event::{self, poll, read, Event, KeyCode, KeyEvent},
@@ -31,7 +31,6 @@ mod entity;
 mod magic;
 pub mod point;
 mod render_action;
-use crate::console::{coord::*, loader_reverse, AsColor};
 use crate::entity::*;
 
 struct State {

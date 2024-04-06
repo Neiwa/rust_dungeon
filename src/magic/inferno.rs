@@ -38,7 +38,7 @@ impl Magic for InfernoMagic {
         vec![
             Box::new(FireballObject::new(
                 location + Direction::Up.as_vector() + Direction::Left.as_vector(),
-                Direction::Up.as_vector() + Direction::Left.as_vector() * 2.0,
+                Direction::Up.as_vector() + Direction::Left.as_vector() * 2.,
                 ticker,
             )),
             Box::new(FireballObject::new(
@@ -48,12 +48,12 @@ impl Magic for InfernoMagic {
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_vector() + Direction::Left.as_vector(),
-                Direction::Up.as_vector() * 2.0 + Direction::Left.as_vector(),
+                Direction::Up.as_vector() * 2. + Direction::Left.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_vector(),
-                Direction::Up.as_vector() * 2.0 + Direction::Left.as_vector(),
+                Direction::Up.as_vector() * 2. + Direction::Left.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
@@ -63,12 +63,12 @@ impl Magic for InfernoMagic {
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_vector(),
-                Direction::Up.as_vector() * 2.0 + Direction::Right.as_vector(),
+                Direction::Up.as_vector() * 2. + Direction::Right.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_vector() + Direction::Right.as_vector(),
-                Direction::Up.as_vector() * 2.0 + Direction::Right.as_vector(),
+                Direction::Up.as_vector() * 2. + Direction::Right.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
@@ -78,12 +78,12 @@ impl Magic for InfernoMagic {
             )),
             Box::new(FireballObject::new(
                 location + Direction::Up.as_vector() + Direction::Right.as_vector(),
-                Direction::Up.as_vector() + Direction::Right.as_vector() * 2.0,
+                Direction::Up.as_vector() + Direction::Right.as_vector() * 2.,
                 ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Right.as_vector(),
-                Direction::Right.as_vector() * 2.0 + Direction::Up.as_vector(),
+                Direction::Right.as_vector() * 2. + Direction::Up.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
@@ -93,12 +93,12 @@ impl Magic for InfernoMagic {
             )),
             Box::new(FireballObject::new(
                 location + Direction::Right.as_vector(),
-                Direction::Right.as_vector() * 2.0 + Direction::Down.as_vector(),
+                Direction::Right.as_vector() * 2. + Direction::Down.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_vector() + Direction::Right.as_vector(),
-                Direction::Down.as_vector() + Direction::Right.as_vector() * 2.0,
+                Direction::Down.as_vector() + Direction::Right.as_vector() * 2.,
                 ticker,
             )),
             Box::new(FireballObject::new(
@@ -108,12 +108,12 @@ impl Magic for InfernoMagic {
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_vector() + Direction::Right.as_vector(),
-                Direction::Down.as_vector() * 2.0 + Direction::Right.as_vector(),
+                Direction::Down.as_vector() * 2. + Direction::Right.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_vector(),
-                Direction::Down.as_vector() * 2.0 + Direction::Right.as_vector(),
+                Direction::Down.as_vector() * 2. + Direction::Right.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
@@ -123,12 +123,12 @@ impl Magic for InfernoMagic {
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_vector(),
-                Direction::Down.as_vector() * 2.0 + Direction::Left.as_vector(),
+                Direction::Down.as_vector() * 2. + Direction::Left.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_vector() + Direction::Left.as_vector(),
-                Direction::Down.as_vector() * 2.0 + Direction::Left.as_vector(),
+                Direction::Down.as_vector() * 2. + Direction::Left.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
@@ -138,12 +138,12 @@ impl Magic for InfernoMagic {
             )),
             Box::new(FireballObject::new(
                 location + Direction::Down.as_vector() + Direction::Left.as_vector(),
-                Direction::Down.as_vector() + Direction::Left.as_vector() * 2.0,
+                Direction::Down.as_vector() + Direction::Left.as_vector() * 2.,
                 ticker,
             )),
             Box::new(FireballObject::new(
                 location + Direction::Left.as_vector(),
-                Direction::Left.as_vector() * 2.0 + Direction::Down.as_vector(),
+                Direction::Left.as_vector() * 2. + Direction::Down.as_vector(),
                 ticker,
             )),
             Box::new(FireballObject::new(
@@ -153,7 +153,7 @@ impl Magic for InfernoMagic {
             )),
             Box::new(FireballObject::new(
                 location + Direction::Left.as_vector(),
-                Direction::Left.as_vector() * 2.0 + Direction::Up.as_vector(),
+                Direction::Left.as_vector() * 2. + Direction::Up.as_vector(),
                 ticker,
             )),
         ]

@@ -102,8 +102,8 @@ fn main() -> io::Result<()> {
 
 fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let (t_cols, t_rows) = size()?;
-    let cols = (((t_cols - 2) / 2) as i32).clamp(0, 30);
-    let rows = ((t_rows - 2) as i32).clamp(0, 30);
+    let cols = ((t_cols - 2) / 2).clamp(0, 29);
+    let rows = (t_rows - 2).clamp(0, 29);
 
     let bounds = Vector2::<f64>::new(cols.into(), rows.into());
 
@@ -119,23 +119,23 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut state = State {
         ticker: 0,
         score: 0,
-        player: Player::new(Point2::new(bounds.x / 2.0, bounds.y / 2.0), 0),
+        player: Player::new(Point2::new(bounds.x / 2., bounds.y / 2.), 0),
         monsters: vec![
-            Monster::new_simple(Point2::new(bounds.x / 4.0, bounds.y / 4.0), 0),
+            Monster::new_simple(Point2::new(bounds.x / 4., bounds.y / 4.), 0),
             Monster::new(
-                Point2::new(bounds.x * 3.0 / 4.0, bounds.y / 4.0),
+                Point2::new(bounds.x * 3. / 4., bounds.y / 4.),
                 0,
                 Some(40),
-                Some(3.0),
+                Some(3.),
             ),
             Monster::new(
-                Point2::new(bounds.x * 3.0 / 4.0, bounds.y * 3.0 / 4.0),
+                Point2::new(bounds.x * 3. / 4., bounds.y * 3. / 4.),
                 0,
                 Some(150),
                 None,
             ),
             Monster::new(
-                Point2::new(bounds.x / 4.0, bounds.y * 3.0 / 4.0),
+                Point2::new(bounds.x / 4., bounds.y * 3. / 4.),
                 0,
                 Some(200),
                 None,
@@ -200,15 +200,15 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
             if old_coord != next_coord {
                 let mut object = state.objects.remove(object_ix);
-                if next_pos.x > 0.0
+                if next_pos.x > 0.
                     && next_pos.x < bounds.x
-                    && next_pos.y > 0.0
+                    && next_pos.y > 0.
                     && next_pos.y < bounds.y
                 {
                     let mut hit = false;
 
                     for monster_ix in 0..state.monsters.len() {
-                        if (state.monsters[monster_ix].location() - next_pos).magnitude() < 1.0 {
+                        if (state.monsters[monster_ix].location() - next_pos).magnitude() < 1. {
                             state.score += 1;
 
                             let monster = state.monsters.remove(monster_ix);
@@ -269,9 +269,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         while let Some(object) = objects.pop() {
                             let location = object.location();
 
-                            if location.x > 0.0
+                            if location.x > 0.
                                 && location.x < bounds.x
-                                && location.y > 0.0
+                                && location.y > 0.
                                 && location.y < bounds.y
                             {
                                 display.enqueue_action(RenderAction::Create {
@@ -295,9 +295,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         while let Some(object) = objects.pop() {
                             let location = object.location();
 
-                            if location.x > 0.0
+                            if location.x > 0.
                                 && location.x < bounds.x
-                                && location.y > 0.0
+                                && location.y > 0.
                                 && location.y < bounds.y
                             {
                                 display.enqueue_action(RenderAction::Create {
@@ -333,12 +333,8 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
             let prev_pos = state.player.location();
             let next_pos = state.player.next_location(step, state.ticker);
 
-            if next_pos.x > 0.0
-                && next_pos.x < bounds.x
-                && next_pos.y > 0.0
-                && next_pos.y < bounds.y
+            if next_pos.x > 0. && next_pos.x < bounds.x && next_pos.y > 0. && next_pos.y < bounds.y
             {
-                trace!("Player at {:?} {:?}", next_pos.as_coord(), next_pos);
                 state.player.set_location(next_pos, state.ticker);
 
                 display.enqueue_action(RenderAction::Move {
@@ -368,9 +364,9 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
                 if next_coord != old_coord {
                     let mut collision = false;
-                    if next_pos.x > 0.0
+                    if next_pos.x > 0.
                         && next_pos.x < bounds.x
-                        && next_pos.y > 0.0
+                        && next_pos.y > 0.
                         && next_pos.y < bounds.y
                     {
                         for other_ix in 0..(monsters_len - 1) {
@@ -381,7 +377,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                             }
                         }
 
-                        if (monster.location() - state.player.location()).magnitude() < 1.0 {
+                        if (monster.location() - state.player.location()).magnitude() < 1. {
                             state.score = 0;
                             exit = true;
                         }
@@ -410,7 +406,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         // SPAWN MONSTERS
 
         if state.monsters.len() < 3 && state.ticker.saturating_sub(last_spawn_tick) >= 5_000 {
-            let monster = Monster::new(Point2::new(4.0, 4.0), state.ticker, None, None);
+            let monster = Monster::new(Point2::new(4., 4.), state.ticker, None, None);
 
             display.enqueue_action(RenderAction::Create {
                 symbol: monster.symbol(),
@@ -426,7 +422,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
         // DRAWING
         display.draw(&state)?;
 
-        if (state.player.location() - Point2::new(1.0, 1.0)).magnitude() < 1.0 || exit {
+        if (state.player.location() - Point2::new(1., 1.)).magnitude() < 1. || exit {
             break;
         }
     }

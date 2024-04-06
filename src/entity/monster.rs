@@ -2,6 +2,8 @@ use nalgebra::{vector, Point2};
 use rand::rngs::StdRng;
 use rand::{random, Rng, SeedableRng};
 
+use crate::console::{AsVector2, Direction};
+
 use super::*;
 
 pub struct Monster {
@@ -27,7 +29,7 @@ impl Monster {
         Self {
             location,
             logic: logic.unwrap_or(100),
-            speed: speed.unwrap_or(2.0) / 1000.0,
+            speed: speed.unwrap_or(2.) / 1000.,
             id,
             last_tick: ticker,
         }
@@ -42,12 +44,12 @@ impl Monster {
 
         let step = match rng.gen::<usize>() % self.logic {
             ..=39 => Some(seek_point - self.location),
-            ..=59 => Some(vector!(seek_point.x - self.location.x, 0.0)),
-            ..=79 => Some(vector!(0.0, seek_point.y - self.location.y)),
-            ..=84 => Some(vector!(1.0, 0.0)),
-            ..=89 => Some(vector!(-1.0, 0.0)),
-            ..=94 => Some(vector!(0.0, -1.0)),
-            ..=99 => Some(vector!(0.0, 1.0)),
+            ..=59 => Some(vector!(seek_point.x - self.location.x, 0.)),
+            ..=79 => Some(vector!(0., seek_point.y - self.location.y)),
+            ..=84 => Some(Direction::Right.as_vector()),
+            ..=89 => Some(Direction::Left.as_vector()),
+            ..=94 => Some(Direction::Up.as_vector()),
+            ..=99 => Some(Direction::Down.as_vector()),
             _ => None,
         };
 

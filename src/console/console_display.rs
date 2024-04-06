@@ -1,13 +1,14 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    io::{self, Write},
+    io,
 };
 
 use crossterm::{
-    cursor, execute, queue,
+    cursor, execute,
     style::{self, Color, Stylize},
     terminal,
 };
+
 use nalgebra::{vector, Point2, Scale2, Vector2};
 
 use super::{loader, loader_reverse, AsColor, AsSymbol, ConsoleUnit};
@@ -119,7 +120,7 @@ impl<'a> ConsoleDisplay<'a> {
             if !skip_clear.contains(&coord) {
                 let spot = self.resolution * coord
                     + (self.top_left - Point2::new(0, 0) + Vector2::new(1, 1));
-                queue!(
+                execute!(
                     self.stdout,
                     cursor::MoveTo(spot.x, spot.y),
                     style::PrintStyledContent(' '.on(bg_color(spot))),
@@ -133,7 +134,7 @@ impl<'a> ConsoleDisplay<'a> {
                 (coord, symbol, color) => {
                     let spot = self.resolution * coord
                         + (self.top_left - Point2::new(0, 0) + Vector2::new(1, 1));
-                    queue!(
+                    execute!(
                         self.stdout,
                         cursor::MoveTo(spot.x, spot.y),
                         style::PrintStyledContent(symbol.with(color).on(bg_color(spot))),
@@ -146,25 +147,25 @@ impl<'a> ConsoleDisplay<'a> {
     }
 
     fn draw_state(&mut self, state: &State) -> io::Result<()> {
-        queue_value_draw(
+        draw_value(
             self.stdout,
             self.status_indicators.get("clock"),
             format!("{:>3}", state.ticker / 1000),
         )?;
-        queue_value_draw(
+        draw_value(
             self.stdout,
             self.status_indicators.get("score"),
             format!("{:>3}", state.score),
         )?;
 
-        queue_spells_draw(
+        draw_spells(
             self.stdout,
             self.status_indicators.get("spells"),
             &state.player,
             state.ticker,
         )?;
 
-        queue_value_draw(
+        draw_value(
             self.stdout,
             self.status_indicators.get("energy"),
             format!(
@@ -188,6 +189,7 @@ impl Display for ConsoleDisplay<'_> {
     }
 
     fn draw_initial(&mut self, state: &State) -> io::Result<()> {
+        execute!(self.stdout, terminal::BeginSynchronizedUpdate)?;
         execute!(self.stdout, terminal::Clear(terminal::ClearType::All))?;
 
         let (width, height) = (self.dimensions.x, self.dimensions.y);
@@ -206,7 +208,7 @@ impl Display for ConsoleDisplay<'_> {
                     _ => " ".on(bg_color(Point2::new(x, y))),
                 };
                 let spot = self.top_left + vector!(x, y);
-                queue!(
+                execute!(
                     self.stdout,
                     cursor::MoveTo(spot.x, spot.y),
                     style::PrintStyledContent(content)
@@ -231,7 +233,7 @@ impl Display for ConsoleDisplay<'_> {
                 RenderAction::Create {
                     symbol: '🚪',
                     color: Color::White,
-                    location: Point2::new(1.0, 1.0),
+                    location: Point2::new(1., 1.),
                 },
             ]);
 
@@ -243,7 +245,7 @@ impl Display for ConsoleDisplay<'_> {
 
         self.draw_state(state)?;
 
-        self.stdout.flush()?;
+        execute!(self.stdout, terminal::EndSynchronizedUpdate)?;
 
         Ok(())
     }
@@ -255,14 +257,13 @@ impl Display for ConsoleDisplay<'_> {
 
         self.draw_state(state)?;
 
-        self.stdout.flush()?;
         execute!(self.stdout, terminal::EndSynchronizedUpdate)?;
 
         Ok(())
     }
 }
 
-fn queue_value_draw(
+fn draw_value(
     stdout: &mut io::Stdout,
     indicator: Option<&Indicator>,
     value: String,
@@ -273,7 +274,7 @@ fn queue_value_draw(
 
     let ind = indicator.unwrap();
 
-    queue!(
+    execute!(
         stdout,
         cursor::MoveTo(ind.coord.x, ind.coord.y),
         style::PrintStyledContent(value.with(ind.color).on(ind.bg_color)),
@@ -282,7 +283,7 @@ fn queue_value_draw(
     Ok(())
 }
 
-fn queue_spells_draw(
+fn draw_spells(
     stdout: &mut io::Stdout,
     indicator: Option<&Indicator>,
     player: &Player,
@@ -294,7 +295,7 @@ fn queue_spells_draw(
 
     let ind = indicator.unwrap();
 
-    queue!(stdout, cursor::MoveTo(ind.coord.x, ind.coord.y))?;
+    execute!(stdout, cursor::MoveTo(ind.coord.x, ind.coord.y))?;
 
     let spell_len = player.spells.len();
     for i in 0..spell_len {
@@ -309,12 +310,12 @@ fn queue_spells_draw(
         };
 
         if i > 0 {
-            queue!(
+            execute!(
                 stdout,
                 style::PrintStyledContent("═".with(ind.bg_color).on(Color::Black))
             )?;
         }
-        queue!(
+        execute!(
             stdout,
             style::PrintStyledContent(
                 spell

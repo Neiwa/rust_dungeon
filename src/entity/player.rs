@@ -60,7 +60,7 @@ impl Player {
 
     pub fn next_location(&self, vector: Vector2<f64>, ticker: u128) -> Point2<f64> {
         self.location
-            + vector.normalize() * self.speed() / 1000.0
+            + vector.normalize() * self.speed() / 1000.
                 * ticker.saturating_sub(self.last_tick) as f64
     }
 
@@ -87,7 +87,7 @@ impl Player {
 
 impl Unit for Player {
     fn speed(&self) -> f64 {
-        5.0
+        5.
     }
 
     fn set_location(&mut self, location: Point2<f64>, ticker: u128) {

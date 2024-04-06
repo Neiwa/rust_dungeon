@@ -1,6 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 
-use crossterm::event::{Event, KeyCode, MouseButton};
+use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
 
 use crate::Coord;
 
@@ -48,45 +48,45 @@ impl InputTracker {
         while let Some(event) = self.current_events.pop_front() {
             match event {
                 Event::Key(key_event) => match key_event.kind {
-                    crossterm::event::KeyEventKind::Press => {
+                    KeyEventKind::Press => {
                         if !self.pressed_keys.contains(&key_event.code) {
                             new_state.insert(InputState::Press(Input::Key(key_event.code)));
                             new_state.insert(InputState::Active(Input::Key(key_event.code)));
                             self.pressed_keys.insert(key_event.code);
                         }
                     }
-                    crossterm::event::KeyEventKind::Release => {
+                    KeyEventKind::Release => {
                         new_state.insert(InputState::Release(Input::Key(key_event.code)));
                         self.pressed_keys.remove(&key_event.code);
                         still_active_keys.remove(&key_event.code);
                     }
-                    crossterm::event::KeyEventKind::Repeat => todo!(),
+                    KeyEventKind::Repeat => todo!(),
                 },
                 Event::Mouse(mouse_event) => {
                     self.mouse_coord =
                         Coord::new(mouse_event.column.into(), mouse_event.row.into());
+
                     if let Some(input) = mouse_event.kind.as_input() {
                         match mouse_event.kind {
-                            crossterm::event::MouseEventKind::Down(key) => {
+                            MouseEventKind::Down(key) => {
                                 if !self.pressed_mouse_buttons.contains(&key) {
                                     new_state.insert(InputState::Press(input));
                                     new_state.insert(InputState::Active(input));
                                     self.pressed_mouse_buttons.insert(key);
                                 }
                             }
-                            crossterm::event::MouseEventKind::Up(key) => {
+                            MouseEventKind::Up(key) => {
                                 new_state.insert(InputState::Release(input));
                                 self.pressed_mouse_buttons.remove(&key);
                                 still_active_mouse.remove(&key);
                             }
-                            crossterm::event::MouseEventKind::ScrollDown
-                            | crossterm::event::MouseEventKind::ScrollUp
-                            | crossterm::event::MouseEventKind::ScrollLeft
-                            | crossterm::event::MouseEventKind::ScrollRight => {
+                            MouseEventKind::ScrollDown
+                            | MouseEventKind::ScrollUp
+                            | MouseEventKind::ScrollLeft
+                            | MouseEventKind::ScrollRight => {
                                 new_state.insert(InputState::Press(input));
                             }
-                            crossterm::event::MouseEventKind::Moved
-                            | crossterm::event::MouseEventKind::Drag(_) => {}
+                            MouseEventKind::Moved | MouseEventKind::Drag(_) => {}
                         };
                     }
                 }

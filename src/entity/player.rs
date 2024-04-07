@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use nalgebra::{Point2, Vector2};
 
 use crate::{
@@ -16,6 +18,21 @@ pub struct Player {
     last_action_tick: u128,
 
     energy_recharge_tracker: u128,
+}
+
+impl Debug for Player {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Player")
+            .field("location", &self.location)
+            .field("energy", &self.energy)
+            .field("max_energy", &self.max_energy)
+            .field("spells.len", &self.spells.len())
+            .field("active_spell", &self.active_spell)
+            .field("last_tick", &self.last_tick)
+            .field("last_action_tick", &self.last_action_tick)
+            .field("energy_recharge_tracker", &self.energy_recharge_tracker)
+            .finish()
+    }
 }
 
 impl Player {

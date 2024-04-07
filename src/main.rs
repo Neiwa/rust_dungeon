@@ -12,8 +12,8 @@ use display::Display;
 use entity::monster::Monster;
 use entity::object::Object;
 use entity::player::Player;
-use log::{info, trace, LevelFilter};
-use nalgebra::{Point2, Scale2, Vector2};
+use log::{debug, info, trace, LevelFilter};
+use nalgebra::{convert, vector, Point2, Scale2, Vector2};
 use render_action::RenderAction;
 use simplelog::{format_description, ConfigBuilder, WriteLogger};
 
@@ -104,16 +104,39 @@ fn main() -> io::Result<()> {
 
 fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let (t_cols, t_rows) = size()?;
-    let cols = ((t_cols - 2) / 2).clamp(0, 29);
-    let rows = (t_rows - 2).clamp(0, 29);
+    debug!("size: {:?}", size()?);
 
-    let bounds = Vector2::<f64>::new(cols.into(), rows.into());
+    let scale = Scale2::new(2, 1);
 
-    let mut display = ConsoleDisplay::new(
-        Point2::new(0, 0),
-        Vector2::new((cols * 2 + 3) as u16, (rows + 2) as u16),
-        Scale2::new(2, 1),
-        stdout,
+    let game_cols = t_cols - 2;
+    let game_rows = t_rows - 2;
+
+    let game_bounds = Vector2::<u16>::new(
+        u16::min((game_cols - 2) / 2, 29),
+        u16::min(game_rows - 1, 29),
+    );
+    debug!("game_bounds: {:?}", game_bounds);
+
+    let display_bounds = scale * (game_bounds + vector![1, 1]) + vector![1, 1];
+    debug!("display_bounds: {:?}", display_bounds);
+
+    let bounds: Vector2<f64> = convert(game_bounds);
+    debug!("bounds: {:?}", bounds);
+
+    let dimensions = Vector2::new(t_cols, t_rows);
+    debug!("dimensions: {:?}", dimensions);
+
+    let display_top_left = Point2::new(
+        (t_cols - display_bounds.x) / 2,
+        (t_rows - display_bounds.y) / 3,
+    );
+
+    let mut display = ConsoleDisplay::new(display_top_left, display_bounds, scale, stdout);
+
+    let mut input_tracker = InputTracker::new_mouse(
+        Point2::new(t_cols / 2, t_rows / 2),
+        convert(display.game_area_offset()),
+        convert(scale),
     );
 
     let timer = Instant::now();
@@ -153,7 +176,6 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
     let mut exit = false;
     let mut pause: Option<u128> = None;
     let mut pause_ticker = 0;
-    let mut input_tracker = InputTracker::new();
 
     loop {
         if poll(Duration::from_millis(20))? {
@@ -176,8 +198,18 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
                         pause = None;
                     }
                 }
+                Ok(Event::Key(KeyEvent {
+                    code: KeyCode::Insert,
+                    kind: KeyEventKind::Release,
+                    ..
+                })) => {
+                    debug!("Player.location {:?}", state.player.location());
+                    debug!("Player.coord    {:?}", state.player.location().as_coord());
+                }
                 Ok(ok_event) => {
-                    input_tracker.register_input_event(ok_event);
+                    if pause.is_none() {
+                        input_tracker.register_input_event(ok_event);
+                    }
                 }
                 _ => {}
             }
@@ -253,11 +285,7 @@ fn game(stdout: &mut io::Stdout) -> io::Result<i32> {
 
         // PLAYER
 
-        let (input_state, cursor_coord) = input_tracker.calculate_state();
-        let mouse_coord = Point2::new(
-            (cursor_coord.x.saturating_sub(1) / 2).into(),
-            cursor_coord.y.saturating_sub(1).into(),
-        );
+        let (input_state, mouse_coord) = input_tracker.calculate_state();
 
         let mut step: Vector2<f64> = Vector2::zeros();
 

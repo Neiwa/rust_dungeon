@@ -1,7 +1,7 @@
 use std::collections::{HashSet, VecDeque};
 
 use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
-use nalgebra::Point2;
+use nalgebra::{convert, Point2, Scale2, Vector2};
 
 use super::input::*;
 
@@ -11,22 +11,30 @@ pub struct InputTracker {
     mouse_coord: Point2<u16>,
     current_events: VecDeque<Event>,
     current_state: HashSet<InputState>,
-    current_mouse_coord: Point2<u16>,
+    current_mouse_coord: Point2<f64>,
+    game_area_offset: Vector2<f64>,
+    game_area_scale: Scale2<f64>,
 }
 
 impl InputTracker {
     pub fn new() -> Self {
-        Self::new_mouse(Point2::new(0, 0))
+        Self::new_mouse(Point2::new(0, 0), Vector2::new(1., 1.), Scale2::new(2., 1.))
     }
 
-    pub fn new_mouse(mouse_location: Point2<u16>) -> Self {
+    pub fn new_mouse(
+        mouse_location: Point2<u16>,
+        game_area_offset: Vector2<f64>,
+        game_area_scale: Scale2<f64>,
+    ) -> Self {
         Self {
             pressed_keys: HashSet::new(),
             pressed_mouse_buttons: HashSet::new(),
             mouse_coord: mouse_location,
             current_events: VecDeque::new(),
             current_state: HashSet::new(),
-            current_mouse_coord: mouse_location,
+            current_mouse_coord: convert(mouse_location),
+            game_area_offset,
+            game_area_scale,
         }
     }
 
@@ -39,7 +47,7 @@ impl InputTracker {
         }
     }
 
-    pub fn calculate_state(&mut self) -> (&HashSet<InputState>, &Point2<u16>) {
+    pub fn calculate_state(&mut self) -> (&HashSet<InputState>, &Point2<f64>) {
         let mut new_state: HashSet<InputState> = HashSet::new();
         let mut still_active_keys = self.pressed_keys.clone();
         let mut still_active_mouse = self.pressed_mouse_buttons.clone();
@@ -103,7 +111,14 @@ impl InputTracker {
         }
 
         self.current_state = new_state;
-        self.current_mouse_coord = self.mouse_coord;
+
+        let mouse_coord: Point2<f64> = convert(self.mouse_coord);
+        let offset_coord = mouse_coord - self.game_area_offset;
+        self.current_mouse_coord = self
+            .game_area_scale
+            .try_inverse_transform_point(&offset_coord)
+            .unwrap();
+
         (&self.current_state, &self.current_mouse_coord)
     }
 }

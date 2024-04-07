@@ -14,6 +14,25 @@ use nalgebra::{vector, Point2, Scale2, Vector2};
 use super::{loader, loader_reverse, AsColor, AsSymbol, ConsoleUnit};
 use crate::{display::Display, player::Player, render_action::RenderAction, Entity, State};
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum ConsoleRenderAction {
+    Move {
+        symbol: char,
+        color: Color,
+        old: Point2<f64>,
+        new: Point2<f64>,
+    },
+    Remove {
+        coord: Point2<f64>,
+        symbol: char,
+    },
+    Create {
+        symbol: char,
+        color: Color,
+        location: Point2<f64>,
+    },
+}
+
 pub struct ConsoleDisplay<'a> {
     pub status_indicators: HashMap<&'a str, Indicator>,
     top_left: Point2<u16>,
@@ -85,6 +104,10 @@ impl<'a> ConsoleDisplay<'a> {
             render_actions: VecDeque::new(),
             game_area_offset: top_left - Point2::new(0, 0) + Vector2::new(1, 1),
         }
+    }
+
+    pub fn game_area_offset(&self) -> Vector2<u16> {
+        self.game_area_offset
     }
 
     fn draw_actions(&mut self) -> io::Result<()> {
@@ -188,6 +211,32 @@ impl Display for ConsoleDisplay<'_> {
         self.render_actions.push_back(action);
     }
 
+    fn enqueue_action2(&mut self, action: crate::render_action::RenderAction2) {
+        match action {
+            crate::render_action::RenderAction2::Move { unit, old, new } => {
+                self.render_actions.push_back(RenderAction::Move {
+                    symbol: unit.symbol(),
+                    color: unit.color(),
+                    old,
+                    new,
+                });
+            }
+            crate::render_action::RenderAction2::Remove { coord, unit } => {
+                self.render_actions.push_back(RenderAction::Remove {
+                    symbol: unit.symbol(),
+                    coord,
+                });
+            }
+            crate::render_action::RenderAction2::Create { unit, location } => {
+                self.render_actions.push_back(RenderAction::Create {
+                    symbol: unit.symbol(),
+                    color: unit.color(),
+                    location,
+                });
+            }
+        }
+    }
+
     fn draw_initial(&mut self, state: &State) -> io::Result<()> {
         execute!(self.stdout, terminal::BeginSynchronizedUpdate)?;
         execute!(self.stdout, terminal::Clear(terminal::ClearType::All))?;
@@ -197,15 +246,16 @@ impl Display for ConsoleDisplay<'_> {
         for y in 0..=height {
             for x in 0..=width {
                 let content = match (x, y) {
-                    (0, 0) => "╔".magenta(),
-                    (0, y) if y == height => "╚".magenta(),
-                    (x, 0) if x == width => "╗".magenta(),
-                    (x, y) if x == width && y == height => "╝".magenta(),
-                    (0, _) => "║".magenta(),
-                    (x, _) if x == width => "║".magenta(),
-                    (_, 0) => "═".magenta(),
-                    (_, y) if y == height => "═".magenta(),
-                    _ => " ".on(bg_color(Point2::new(x, y))),
+                    // (_, 0) => format!("{}", x % 10).magenta(),
+                    (0, 0) => String::from("╔").magenta(),
+                    (0, y) if y == height => String::from("╚").magenta(),
+                    (x, 0) if x == width => String::from("╗").magenta(),
+                    (x, y) if x == width && y == height => String::from("╝").magenta(),
+                    (0, _) => String::from("║").magenta(),
+                    (x, _) if x == width => String::from("║").magenta(),
+                    (_, 0) => String::from("═").magenta(),
+                    (_, y) if y == height => String::from("═").magenta(),
+                    _ => String::from(" ").on(bg_color(Point2::new(x, y))),
                 };
                 let spot = self.top_left + vector!(x, y);
                 execute!(

@@ -1,6 +1,6 @@
 use crossterm::style::Color;
 
-use crate::{monster::Monster, object::Object, player::Player};
+use crate::{magic::fireball::FireballObject, monster::Monster, object::Object, player::Player};
 
 use super::{AsColor, AsSymbol};
 

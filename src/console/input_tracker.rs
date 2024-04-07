@@ -17,6 +17,7 @@ pub struct InputTracker {
 }
 
 impl InputTracker {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::new_mouse(Point2::new(0, 0), Vector2::new(1., 1.), Scale2::new(2., 1.))
     }

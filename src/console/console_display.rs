@@ -14,25 +14,6 @@ use nalgebra::{vector, Point2, Scale2, Vector2};
 use super::{loader, loader_reverse, AsColor, AsSymbol, ConsoleUnit};
 use crate::{display::Display, player::Player, render_action::RenderAction, Entity, State};
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum ConsoleRenderAction {
-    Move {
-        symbol: char,
-        color: Color,
-        old: Point2<f64>,
-        new: Point2<f64>,
-    },
-    Remove {
-        coord: Point2<f64>,
-        symbol: char,
-    },
-    Create {
-        symbol: char,
-        color: Color,
-        location: Point2<f64>,
-    },
-}
-
 pub struct ConsoleDisplay<'a> {
     pub status_indicators: HashMap<&'a str, Indicator>,
     top_left: Point2<u16>,
@@ -209,32 +190,6 @@ impl<'a> ConsoleDisplay<'a> {
 impl Display for ConsoleDisplay<'_> {
     fn enqueue_action(&mut self, action: RenderAction) {
         self.render_actions.push_back(action);
-    }
-
-    fn enqueue_action2(&mut self, action: crate::render_action::RenderAction2) {
-        match action {
-            crate::render_action::RenderAction2::Move { unit, old, new } => {
-                self.render_actions.push_back(RenderAction::Move {
-                    symbol: unit.symbol(),
-                    color: unit.color(),
-                    old,
-                    new,
-                });
-            }
-            crate::render_action::RenderAction2::Remove { coord, unit } => {
-                self.render_actions.push_back(RenderAction::Remove {
-                    symbol: unit.symbol(),
-                    coord,
-                });
-            }
-            crate::render_action::RenderAction2::Create { unit, location } => {
-                self.render_actions.push_back(RenderAction::Create {
-                    symbol: unit.symbol(),
-                    color: unit.color(),
-                    location,
-                });
-            }
-        }
     }
 
     fn draw_initial(&mut self, state: &State) -> io::Result<()> {

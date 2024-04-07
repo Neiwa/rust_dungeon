@@ -1,6 +1,6 @@
 use crossterm::style::Color;
 
-use crate::{magic::fireball::FireballObject, monster::Monster, object::Object, player::Player};
+use crate::{monster::Monster, object::Object, player::Player};
 
 use super::{AsColor, AsSymbol};
 
@@ -53,6 +53,16 @@ impl ConsoleUnit for Monster {
 }
 
 impl ConsoleUnit for dyn Object {
+    fn color(&self) -> Color {
+        self.get_spell().as_color()
+    }
+
+    fn symbol(&self) -> char {
+        self.get_spell().as_symbol()
+    }
+}
+
+impl ConsoleUnit for &dyn Object {
     fn color(&self) -> Color {
         self.get_spell().as_color()
     }

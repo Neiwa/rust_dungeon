@@ -12,7 +12,7 @@ use display::Display;
 use entity::monster::Monster;
 use entity::object::Object;
 use entity::player::Player;
-use log::{debug, info, trace, LevelFilter};
+use log::{debug, info, LevelFilter};
 use nalgebra::{convert, vector, Point2, Scale2, Vector2};
 use render_action::RenderAction;
 use simplelog::{format_description, ConfigBuilder, WriteLogger};
